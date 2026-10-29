@@ -58,6 +58,7 @@ The exit code is 0 when every pod succeeded, 1 when some failed, 2 for a usage e
 - [Controller](docs/controller.md): install, Broadcast and BroadcastPolicy objects, Continuous mode
 - [Permissions](docs/rbac.md): the RBAC rules a direct-mode user needs, with an example Role
 - [Troubleshooting](docs/troubleshooting.md): what each error means and how to fix it
+- [Testing](docs/testing.md): what is tested, how, where it has run, and the results
 
 ## Development
 
