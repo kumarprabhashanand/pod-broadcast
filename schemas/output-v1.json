@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kumarprabhashanand/pod-broadcast/schemas/output-v1.json",
+  "title": "kubectl broadcast output, schema v1",
+  "type": "object",
+  "required": ["schemaVersion", "mode", "dryRun", "target", "request", "outcome", "summary", "pods"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "v1" },
+    "mode": { "enum": ["direct"] },
+    "dryRun": { "type": "boolean" },
+    "target": {
+      "type": "object",
+      "required": ["namespace"],
+      "additionalProperties": false,
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["Service", "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet"] },
+        "name": { "type": "string", "minLength": 1 },
+        "selector": { "type": "string", "minLength": 1 }
+      },
+      "oneOf": [
+        { "required": ["kind", "name"], "not": { "required": ["selector"] } },
+        { "required": ["selector"], "not": { "anyOf": [{ "required": ["kind"] }, { "required": ["name"] }] } }
+      ]
+    },
+    "request": {
+      "type": "object",
+      "required": ["method", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "method": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^/" },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "body": { "type": "string" }
+      }
+    },
+    "outcome": { "enum": ["Succeeded", "PartiallyFailed", "Failed", "DryRun"] },
+    "summary": {
+      "type": "object",
+      "required": ["targeted", "succeeded", "failed", "gone"],
+      "additionalProperties": false,
+      "properties": {
+        "targeted": { "type": "integer", "minimum": 0 },
+        "succeeded": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "gone": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "pods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "uid", "ip", "port", "scheme", "state", "code", "durationMs", "attempts", "error", "body"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "uid": { "type": "string" },
+          "ip": { "type": "string" },
+          "port": { "type": "integer", "minimum": 0, "maximum": 65535 },
+          "scheme": { "enum": ["", "http", "https"] },
+          "state": { "enum": ["Succeeded", "Failed", "Gone", "Pending"] },
+          "code": { "type": "integer", "minimum": 0, "maximum": 599 },
+          "durationMs": { "type": "integer", "minimum": 0 },
+          "attempts": { "type": "integer", "minimum": 0 },
+          "error": { "type": "string" },
+          "body": { "type": "string" }
+        }
+      }
+    }
+  }
+}

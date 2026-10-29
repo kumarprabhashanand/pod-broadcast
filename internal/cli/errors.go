@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
+	"github.com/kumarprabhashanand/pod-broadcast/internal/transport"
 )
 
 func noPodsError(ref target.Ref, namespace string, notReady int, includeNotReady bool) error {
@@ -31,4 +32,19 @@ func noPortError(servicePorts []corev1.ServicePort) error {
 		msg += "; the Service's target ports are " + strings.Join(ports, ", ")
 	}
 	return errors.New(msg)
+}
+
+// proxyVerbs are the RBAC verbs on pods/proxy that each HTTP method needs.
+var proxyVerbs = map[string]string{
+	"GET": "get", "HEAD": "get", "POST": "create", "PUT": "update", "PATCH": "patch", "DELETE": "delete",
+}
+
+func fatalError(err error, method string) error {
+	var forbidden *transport.ForbiddenError
+	if errors.As(err, &forbidden) {
+		if verb, ok := proxyVerbs[method]; ok {
+			return fmt.Errorf("%w (%s requests need the %q verb on pods/proxy)", err, method, verb)
+		}
+	}
+	return err
 }
