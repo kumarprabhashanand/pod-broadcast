@@ -35,6 +35,13 @@ var kindsByPrefix = map[string]Kind{
 	"replicaset":  KindReplicaSet,
 }
 
+func (r Ref) String() string {
+	if r.Kind == "" {
+		return "selector " + r.Selector
+	}
+	return strings.ToLower(string(r.Kind)) + "/" + r.Name
+}
+
 // ParseRef parses a KIND/NAME argument such as svc/orders or deploy/orders.
 func ParseRef(s string) (Ref, error) {
 	prefix, name, ok := strings.Cut(s, "/")
