@@ -210,6 +210,9 @@ func (o *rootOptions) broadcast(ctx context.Context, args []string) error {
 	if o.dryRun {
 		return output.Write(o.streams.Out, o.output, output.NewDryRunReport(cl.namespace, inv.target, spec, endpoints))
 	}
+	if err := checkProxyAccess(ctx, cl.client, cl.namespace, spec.Method); err != nil {
+		return err
+	}
 	results, err := request.Run(ctx, cl.transport, endpoints, spec, opts)
 	if err != nil {
 		return fatalError(err, spec.Method)

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/kumarprabhashanand/pod-broadcast/internal/request"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
@@ -55,8 +57,19 @@ func (r *recorder) Do(_ context.Context, ep target.Endpoint, spec request.Spec) 
 }
 
 func fakeCluster(tr request.Transport, objects ...runtime.Object) clusterFunc {
+	return fakeClusterWithAccess(tr, true, objects...)
+}
+
+// fakeClusterWithAccess answers access reviews for pods/proxy with allowed.
+func fakeClusterWithAccess(tr request.Transport, allowed bool, objects ...runtime.Object) clusterFunc {
 	return func(*genericclioptions.ConfigFlags) (*cluster, error) {
-		return &cluster{client: fake.NewClientset(objects...), namespace: "shop", transport: tr}, nil
+		cs := fake.NewClientset(objects...)
+		cs.PrependReactor("create", "selfsubjectaccessreviews", func(a k8stesting.Action) (bool, runtime.Object, error) {
+			review := a.(k8stesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
+			review.Status.Allowed = allowed
+			return true, review, nil
+		})
+		return &cluster{client: cs, namespace: "shop", transport: tr}, nil
 	}
 }
 
@@ -391,5 +404,20 @@ func TestPresetUsesTheManagementPortAndBasePath(t *testing.T) {
 		if !strings.Contains(r.stdout, want) {
 			t.Errorf("dry run lacks %q:\n%s", want, r.stdout)
 		}
+	}
+}
+
+func TestMissingProxyPermissionStopsBeforeAnyCall(t *testing.T) {
+	for _, method := range []string{"HEAD", "DELETE"} {
+		t.Run(method, func(t *testing.T) {
+			rec := &recorder{}
+			streams, _, out, errOut := genericiooptions.NewTestIOStreams()
+			code := run([]string{"svc/orders", "--port", "8081", "-X", method, "/"}, streams, fakeClusterWithAccess(rec, false, threePods()...))
+			verb := proxyVerbs[method]
+			want := `missing permission: ` + method + ` requests need the "` + verb + `" verb on pods/proxy in namespace "shop"`
+			if code != 2 || !strings.Contains(errOut.String(), want) || len(rec.requests) != 0 || out.Len() != 0 {
+				t.Errorf("exit %d, stderr %q, %d requests; want 2, %q, none", code, errOut.String(), len(rec.requests), want)
+			}
+		})
 	}
 }
