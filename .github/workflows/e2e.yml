@@ -23,7 +23,8 @@ jobs:
       - run: |
           docker build -q -t pod-broadcast-echo:e2e test/apps/echo
           docker build -q -t pod-broadcast-spring:e2e test/apps/spring
-          docker save pod-broadcast-echo:e2e pod-broadcast-spring:e2e -o images.tar
+          docker build -q -t pod-broadcast-controller:dev .
+          docker save pod-broadcast-echo:e2e pod-broadcast-spring:e2e pod-broadcast-controller:dev -o images.tar
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: images

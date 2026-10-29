@@ -1,0 +1,90 @@
+# Runs the controller for all namespaces. Apply deploy/crds first.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pod-broadcast-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pod-broadcast-controller
+  namespace: pod-broadcast-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-broadcast-controller
+rules:
+  - apiGroups: [broadcast.kumarprabhashanand.github.io]
+    resources: [broadcasts]
+    verbs: [get, list, watch, patch, delete]
+  - apiGroups: [broadcast.kumarprabhashanand.github.io]
+    resources: [broadcasts/status]
+    verbs: [update]
+  - apiGroups: [broadcast.kumarprabhashanand.github.io]
+    resources: [broadcastpolicies]
+    verbs: [list, watch]
+  - apiGroups: [""]
+    resources: [pods, services]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets, daemonsets, replicasets]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get]
+  - apiGroups: ["", events.k8s.io]
+    resources: [events]
+    verbs: [create, patch]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, create, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pod-broadcast-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pod-broadcast-controller
+subjects:
+  - kind: ServiceAccount
+    name: pod-broadcast-controller
+    namespace: pod-broadcast-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-broadcast-controller
+  namespace: pod-broadcast-system
+spec:
+  selector:
+    matchLabels: {app: pod-broadcast-controller}
+  template:
+    metadata:
+      labels: {app: pod-broadcast-controller}
+    spec:
+      serviceAccountName: pod-broadcast-controller
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: controller
+          image: pod-broadcast-controller:dev
+          ports:
+            - {name: metrics, containerPort: 8080}
+            - {name: probes, containerPort: 8081}
+          livenessProbe:
+            httpGet: {path: /healthz, port: probes}
+          readinessProbe:
+            httpGet: {path: /readyz, port: probes}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}

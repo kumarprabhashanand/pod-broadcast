@@ -4,11 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/kumarprabhashanand/pod-broadcast/internal/request"
-	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
 )
 
 var jsonType = []request.Header{{Name: "Content-Type", Value: "application/json"}}
@@ -50,6 +46,22 @@ func TestPresetRequests(t *testing.T) {
 	}
 }
 
+func TestSetLogLevelIsRevertedByResettingIt(t *testing.T) {
+	set, _ := Find("spring", "set-log-level")
+	reset, _ := Find("spring", "reset-log-level")
+	call, err := set.Build([]string{"com.shop", "DEBUG"}, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := reset.Build([]string{"com.shop"}, Options{})
+	if call.Revert == nil || !reflect.DeepEqual(*call.Revert, want.Spec) {
+		t.Errorf("revert = %+v, want %+v", call.Revert, want.Spec)
+	}
+	if want.Revert != nil {
+		t.Errorf("reset-log-level has a revert: %+v", want.Revert)
+	}
+}
+
 func TestPresetErrors(t *testing.T) {
 	tests := []struct {
 		preset string
@@ -76,36 +88,6 @@ func TestPresetErrors(t *testing.T) {
 	}
 	if _, err := Find("spring", "shutdown"); err == nil {
 		t.Error("Find(spring shutdown): want error")
-	}
-}
-
-func pod(name, basePath string) *corev1.Pod {
-	p := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}}
-	if basePath != "" {
-		p.Annotations = map[string]string{target.AnnotationActuatorBasePath: basePath}
-	}
-	return p
-}
-
-func TestApplyBasePath(t *testing.T) {
-	p, _ := Find("spring", "health")
-	call, _ := p.Build(nil, Options{})
-	eps := []target.Endpoint{
-		{Pod: pod("plain", "")},
-		{Pod: pod("custom", "/manage")},
-		{Pod: pod("same", "/actuator/")},
-		{Pod: pod("bad", "manage")},
-	}
-	call.ApplyBasePath(eps)
-	if eps[0].Path != "" || eps[1].Path != "/manage/health" || eps[2].Path != "" || eps[3].Err == nil {
-		t.Errorf("endpoints = %+v", eps)
-	}
-
-	flagged, _ := p.Build(nil, Options{BasePath: "/ops"})
-	eps = []target.Endpoint{{Pod: pod("custom", "/manage")}}
-	flagged.ApplyBasePath(eps)
-	if eps[0].Path != "" || flagged.Spec.Path != "/ops/health" {
-		t.Errorf("--base-path should win: %+v, spec path %q", eps, flagged.Spec.Path)
 	}
 }
 

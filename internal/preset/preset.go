@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/kumarprabhashanand/pod-broadcast/internal/request"
-	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
 )
 
 const DefaultBasePath = "/actuator"
@@ -28,16 +27,19 @@ type Preset struct {
 	Flags   string
 	Request string
 	Port    string
-	build   func(args []string, o Options) (method, path string, body []byte, err error)
+	build   buildFunc
+	// revert builds the request that undoes this one, for --for.
+	revert buildFunc
 }
 
-// Call is a preset turned into a request.
+type buildFunc func(args []string, o Options) (method, path string, body []byte, err error)
+
+// Call is a preset turned into a request. Port is the port name to use when neither --port nor the
+// pod's port annotation names one. Revert is set when the preset can be undone.
 type Call struct {
-	Spec request.Spec
-	Port string
-	// relPath is the request path below the base path.
-	relPath      string
-	basePathFlag bool
+	Spec   request.Spec
+	Revert *request.Spec
+	Port   string
 }
 
 var levels = []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"}
@@ -67,17 +69,11 @@ var all = []Preset{
 			}
 			return http.MethodPost, "/loggers/" + logger, []byte(`{"configuredLevel":"` + level + `"}`), nil
 		},
+		revert: func(args []string, o Options) (string, string, []byte, error) { return resetLogLevel(args[:1], o) },
 	},
 	{
 		Group: "spring", Name: "reset-log-level", Args: []string{"LOGGER"},
-		Request: "POST {base}/loggers/LOGGER {}", Port: "management",
-		build: func(args []string, _ Options) (string, string, []byte, error) {
-			logger, err := loggerName(args[0])
-			if err != nil {
-				return "", "", nil, err
-			}
-			return http.MethodPost, "/loggers/" + logger, []byte(`{}`), nil
-		},
+		Request: "POST {base}/loggers/LOGGER {}", Port: "management", build: resetLogLevel,
 	},
 	{
 		Group: "spring", Name: "refresh", Request: "POST {base}/refresh", Port: "management",
@@ -123,38 +119,39 @@ func (p Preset) Build(args []string, o Options) (Call, error) {
 			return Call{}, fmt.Errorf("--base-path: %w", err)
 		}
 	}
-	method, path, body, err := p.build(args, o)
+	spec, err := newSpec(p.build, args, o, base)
 	if err != nil {
 		return Call{}, err
+	}
+	call := Call{Spec: spec, Port: p.Port}
+	if p.revert != nil {
+		revert, err := newSpec(p.revert, args, o, base)
+		if err != nil {
+			return Call{}, err
+		}
+		call.Revert = &revert
+	}
+	return call, nil
+}
+
+func newSpec(build buildFunc, args []string, o Options, base string) (request.Spec, error) {
+	method, path, body, err := build(args, o)
+	if err != nil {
+		return request.Spec{}, err
 	}
 	spec := request.Spec{Method: method, Path: base + path, Body: body}
 	if body != nil {
 		spec.Headers = []request.Header{{Name: "Content-Type", Value: "application/json"}}
 	}
-	return Call{Spec: spec, Port: p.Port, relPath: path, basePathFlag: o.BasePath != ""}, nil
+	return spec, nil
 }
 
-// ApplyBasePath gives pods annotated with their own actuator base path their own request path,
-// unless --base-path was given.
-func (c Call) ApplyBasePath(endpoints []target.Endpoint) {
-	if c.basePathFlag {
-		return
+func resetLogLevel(args []string, _ Options) (string, string, []byte, error) {
+	logger, err := loggerName(args[0])
+	if err != nil {
+		return "", "", nil, err
 	}
-	for i := range endpoints {
-		ep := &endpoints[i]
-		v, ok := ep.Pod.Annotations[target.AnnotationActuatorBasePath]
-		if !ok || ep.Err != nil {
-			continue
-		}
-		base, err := normalizeBasePath(v)
-		if err != nil {
-			ep.Err = fmt.Errorf("annotation %s: %w", target.AnnotationActuatorBasePath, err)
-			continue
-		}
-		if p := base + c.relPath; p != c.Spec.Path {
-			ep.Path = p
-		}
-	}
+	return http.MethodPost, "/loggers/" + logger, []byte(`{}`), nil
 }
 
 func normalizeBasePath(s string) (string, error) {

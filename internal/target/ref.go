@@ -1,8 +1,14 @@
 package target
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+
+	"github.com/kumarprabhashanand/pod-broadcast/api/v1alpha1"
 )
 
 type Kind string
@@ -19,7 +25,7 @@ const (
 type Ref struct {
 	Kind     Kind
 	Name     string
-	Selector string
+	Selector labels.Selector
 }
 
 var kindsByPrefix = map[string]Kind{
@@ -37,7 +43,7 @@ var kindsByPrefix = map[string]Kind{
 
 func (r Ref) String() string {
 	if r.Kind == "" {
-		return "selector " + r.Selector
+		return "selector " + r.Selector.String()
 	}
 	return strings.ToLower(string(r.Kind)) + "/" + r.Name
 }
@@ -53,4 +59,18 @@ func ParseRef(s string) (Ref, error) {
 		return Ref{}, fmt.Errorf("unknown target kind %q in %q: use svc, deploy, sts, ds or rs", prefix, s)
 	}
 	return Ref{Kind: kind, Name: name}, nil
+}
+
+// FromSpec converts a Broadcast's target.
+func FromSpec(t v1alpha1.Target) (Ref, error) {
+	switch {
+	case t.Service != "":
+		return Ref{Kind: KindService, Name: t.Service}, nil
+	case t.WorkloadRef != nil:
+		return Ref{Kind: Kind(t.WorkloadRef.Kind), Name: t.WorkloadRef.Name}, nil
+	case t.Selector != nil:
+		sel, err := metav1.LabelSelectorAsSelector(t.Selector)
+		return Ref{Selector: sel}, err
+	}
+	return Ref{}, errors.New("target has no service, workloadRef or selector")
 }

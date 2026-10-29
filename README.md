@@ -10,7 +10,7 @@ orders-9bf8f4bb-ptg98  Succeeded  204   16ms  1
 2 targeted: 2 succeeded
 ```
 
-Requests go through the Kubernetes API server's pod proxy with your own credentials, so nothing needs to be installed in the cluster.
+Requests go through the Kubernetes API server's pod proxy with your own credentials, so nothing needs to be installed in the cluster. An optional [controller](docs/controller.md) runs broadcasts as Kubernetes objects: for CI, for changes that also reach pods started later and are reverted at the end, and with per-namespace policies.
 
 **Status:** in development, not released yet.
 
@@ -42,6 +42,10 @@ kubectl broadcast -l app=orders spring health -o json
 
 # Show the pods and the exact request without sending anything
 kubectl broadcast svc/orders spring refresh --dry-run
+
+# With the controller: DEBUG logging for 30 minutes, also on pods that start meanwhile
+kubectl broadcast deploy/orders spring set-log-level com.shop.orders DEBUG --for 30m
+kubectl broadcast stop <name>   # end it early; the level is reset on every pod
 ```
 
 Put kubectl flags such as `--context` and `-n` after `broadcast`.
@@ -51,15 +55,17 @@ The exit code is 0 when every pod succeeded, 1 when some failed, 2 for a usage e
 ## Documentation
 
 - [CLI reference](docs/cli.md): targets, flags, port selection, presets, output and exit codes
-- [Permissions](docs/rbac.md): the RBAC rules a user needs, with an example Role
+- [Controller](docs/controller.md): install, Broadcast and BroadcastPolicy objects, Continuous mode
+- [Permissions](docs/rbac.md): the RBAC rules a direct-mode user needs, with an example Role
 - [Troubleshooting](docs/troubleshooting.md): what each error means and how to fix it
 
 ## Development
 
 ```sh
-make test   # unit tests
-make lint   # golangci-lint
-make e2e    # end-to-end tests on a kind cluster; needs Docker and kind
+make test       # unit tests
+make lint       # golangci-lint
+make generate   # deepcopy code and CRDs after changing api/
+make e2e        # end-to-end tests on a kind cluster; needs Docker and kind
 ```
 
 ## License

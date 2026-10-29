@@ -41,3 +41,17 @@ The `ERROR` column, or `error` in JSON, says why:
 | `pod is gone` | The pod was deleted during the call. It isn't counted as a failure. |
 
 Failed calls are retried after connection errors, timeouts and status 429, 500, 502, 503 and 504 (`--retries`, `--backoff`). Requests can reach a pod more than once, so operations should be safe to repeat.
+
+## Controller mode
+
+**`the Broadcast API isn't installed in this cluster`**
+The CRDs and the controller aren't installed; see [Controller](controller.md#install).
+
+**`warning: broadcast NAME has no status yet; is the pod-broadcast controller running?`**
+Check `kubectl get pods -n pod-broadcast-system`, or the namespace of a single-namespace install, and the controller's logs.
+
+**`broadcast NAME rejected: ...`**
+A BroadcastPolicy doesn't allow it, and nothing was called. The message names what didn't match: no policy in the namespace, the method and path, the revert, a limit, or a Secret that isn't listed or lacks the label `broadcast.kumarprabhashanand.github.io/use=true`.
+
+**`port 8080 isn't allowed by a BroadcastPolicy`** (in a pod's row)
+The policy names the port differently on this pod. Use the port the policy allows, by name or by the number it stands for on the pod.

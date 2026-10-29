@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/labels"
+
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
 )
 
@@ -29,7 +31,11 @@ func parseInvocation(args []string, selector, method string) (invocation, error)
 		if len(args) > 0 && isTargetArg(args[0]) {
 			return inv, fmt.Errorf("use either TARGET (%s) or --selector, not both", args[0])
 		}
-		inv.target = target.Ref{Selector: selector}
+		sel, err := labels.Parse(selector)
+		if err != nil {
+			return inv, fmt.Errorf("invalid selector %q: %w", selector, err)
+		}
+		inv.target = target.Ref{Selector: sel}
 	case len(args) == 0:
 		return inv, errors.New("missing TARGET, for example svc/orders, or --selector")
 	case !isTargetArg(args[0]):

@@ -21,10 +21,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/kumarprabhashanand/pod-broadcast/api/v1alpha1"
 )
 
 const (
@@ -37,6 +43,8 @@ var (
 	pluginDir   string
 	kubeContext = os.Getenv("E2E_CONTEXT")
 	client      kubernetes.Interface
+	// objects reads and writes Broadcasts and BroadcastPolicies.
+	objects ctrlclient.Client
 )
 
 func TestMain(m *testing.M) {
@@ -66,6 +74,13 @@ func run(m *testing.M) int {
 	}
 	config.QPS, config.Burst = 50, 100
 	client = kubernetes.NewForConfigOrDie(config)
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	if objects, err = ctrlclient.New(config, ctrlclient.Options{Scheme: scheme}); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
 	return m.Run()
 }
 

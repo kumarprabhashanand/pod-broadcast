@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "properties": {
     "schemaVersion": { "const": "v1" },
-    "mode": { "enum": ["direct"] },
+    "mode": { "enum": ["direct", "controller"] },
     "dryRun": { "type": "boolean" },
     "target": {
       "type": "object",
@@ -59,8 +59,7 @@
           "ip": { "type": "string" },
           "port": { "type": "integer", "minimum": 0, "maximum": 65535 },
           "scheme": { "enum": ["", "http", "https"] },
-          "path": { "type": "string", "pattern": "^/" },
-          "state": { "enum": ["Succeeded", "Failed", "Gone", "Pending"] },
+          "state": { "enum": ["Succeeded", "Failed", "Gone", "Pending", "Reverted", "RevertFailed"] },
           "code": { "type": "integer", "minimum": 0, "maximum": 599 },
           "durationMs": { "type": "integer", "minimum": 0 },
           "attempts": { "type": "integer", "minimum": 0 },

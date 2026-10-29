@@ -9,14 +9,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
+
+	"github.com/kumarprabhashanand/pod-broadcast/api/v1alpha1"
 )
 
 const (
-	AnnotationDomain = "broadcast.kumarprabhashanand.github.io"
-	AnnotationPort   = AnnotationDomain + "/port"
-	AnnotationScheme = AnnotationDomain + "/scheme"
-
-	AnnotationActuatorBasePath = AnnotationDomain + "/actuator-base-path"
+	AnnotationPort   = v1alpha1.GroupName + "/port"
+	AnnotationScheme = v1alpha1.GroupName + "/scheme"
 )
 
 var (
@@ -30,21 +29,20 @@ type Endpoint struct {
 	Pod    *corev1.Pod
 	Port   int32
 	Scheme string
-	// Path replaces the request path for this pod when set.
-	Path string
-	Err  error
+	Err    error
 }
 
-// PortChoice holds an explicitly requested port and scheme, and a preset's default port name.
+// PortChoice holds the requested port and scheme, and the port name to use when neither the
+// request nor the pod's annotation names a port.
 type PortChoice struct {
-	Port       *intstr.IntOrString
-	Scheme     string
-	PresetPort string
+	Port        *intstr.IntOrString
+	Scheme      string
+	DefaultPort string
 }
 
 // Endpoints chooses a port and scheme for every pod in set. For the port the first rule that applies
-// wins: the explicit port, the pod's port annotation, the preset's default port, the Service's only
-// port. It returns ErrNoPort when no rule applies to any pod.
+// wins: the requested port, the pod's port annotation, the default port, the Service's only port.
+// It returns ErrNoPort when no rule applies to any pod.
 func Endpoints(set Set, choice PortChoice) ([]Endpoint, error) {
 	var servicePort *intstr.IntOrString
 	if len(set.ServicePorts) == 1 {
@@ -64,7 +62,7 @@ func Endpoints(set Set, choice PortChoice) ([]Endpoint, error) {
 			ep.Err = fmt.Errorf("%w: pod has no %s annotation", ErrNoPort, AnnotationPort)
 		default:
 			applied++
-			ep.Port, ep.Err = containerPort(pod, spec)
+			ep.Port, ep.Err = ContainerPort(pod, spec)
 		}
 		if ep.Err == nil {
 			ep.Scheme, ep.Err = scheme(pod, choice.Scheme)
@@ -109,8 +107,8 @@ func portSpec(pod *corev1.Pod, choice PortChoice, servicePort *intstr.IntOrStrin
 		}
 		return p, true, nil
 	}
-	if choice.PresetPort != "" {
-		return intstr.FromString(choice.PresetPort), true, nil
+	if choice.DefaultPort != "" {
+		return intstr.FromString(choice.DefaultPort), true, nil
 	}
 	if servicePort != nil {
 		return *servicePort, true, nil
@@ -126,9 +124,9 @@ func TargetPort(p corev1.ServicePort) intstr.IntOrString {
 	return p.TargetPort
 }
 
-// containerPort resolves a named port the way Services do: TCP ports of the regular containers and
+// ContainerPort resolves a named port the way Services do: TCP ports of the regular containers and
 // of sidecar (restartable init) containers. Unlike Services, a name found twice is an error.
-func containerPort(pod *corev1.Pod, spec intstr.IntOrString) (int32, error) {
+func ContainerPort(pod *corev1.Pod, spec intstr.IntOrString) (int32, error) {
 	if spec.Type == intstr.Int {
 		return spec.IntVal, nil
 	}

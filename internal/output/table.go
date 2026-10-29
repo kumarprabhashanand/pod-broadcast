@@ -60,26 +60,13 @@ func writeDryRun(w io.Writer, r Report) error {
 		return err
 	}
 
-	showPath := slices.ContainsFunc(r.Pods, func(p Pod) bool { return p.Path != "" })
-	header := "POD\tIP\tPORT\tSCHEME"
-	if showPath {
-		header += "\tPATH"
-	}
-	rows := []string{header + "\tERROR"}
+	rows := []string{"POD\tIP\tPORT\tSCHEME\tERROR"}
 	for _, p := range r.Pods {
 		port := ""
 		if p.Port != 0 {
 			port = strconv.Itoa(int(p.Port))
 		}
-		row := fmt.Sprintf("%s\t%s\t%s\t%s", p.Name, p.IP, port, p.Scheme)
-		if showPath {
-			path := p.Path
-			if path == "" {
-				path = r.Request.Path
-			}
-			row += "\t" + path
-		}
-		rows = append(rows, row+"\t"+p.Error)
+		rows = append(rows, fmt.Sprintf("%s\t%s\t%s\t%s\t%s", p.Name, p.IP, port, p.Scheme, p.Error))
 	}
 	if err := WriteRows(w, rows); err != nil {
 		return err

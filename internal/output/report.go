@@ -7,6 +7,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
+	"github.com/kumarprabhashanand/pod-broadcast/api/v1alpha1"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/request"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
 )
@@ -72,7 +73,6 @@ type Pod struct {
 	IP         string `json:"ip"`
 	Port       int32  `json:"port"`
 	Scheme     string `json:"scheme"`
-	Path       string `json:"path,omitempty"`
 	State      string `json:"state"`
 	Code       int    `json:"code"`
 	DurationMs int64  `json:"durationMs"`
@@ -85,9 +85,12 @@ func newReport(ns string, ref target.Ref, spec request.Spec) Report {
 	r := Report{
 		SchemaVersion: SchemaVersion,
 		Mode:          "direct",
-		Target:        Target{Namespace: ns, Kind: string(ref.Kind), Name: ref.Name, Selector: ref.Selector},
+		Target:        Target{Namespace: ns, Kind: string(ref.Kind), Name: ref.Name},
 		Request:       Request{Method: spec.Method, Path: spec.Path, Body: string(spec.Body)},
 		Pods:          []Pod{},
+	}
+	if ref.Selector != nil {
+		r.Target.Selector = ref.Selector.String()
 	}
 	if len(spec.Headers) > 0 {
 		r.Request.Headers = map[string]string{}
@@ -105,7 +108,6 @@ func podFor(ep target.Endpoint) Pod {
 		IP:     ep.Pod.Status.PodIP,
 		Port:   ep.Port,
 		Scheme: ep.Scheme,
-		Path:   ep.Path,
 	}
 }
 
@@ -133,15 +135,40 @@ func NewReport(ns string, ref target.Ref, spec request.Spec, results []request.R
 		}
 	}
 	r.Summary.Targeted = len(results)
-	switch {
-	case r.Summary.Failed == 0 && r.Summary.Succeeded > 0:
-		r.Outcome = OutcomeSucceeded
-	case r.Summary.Succeeded == 0:
-		r.Outcome = OutcomeFailed
-	default:
-		r.Outcome = OutcomePartiallyFailed
-	}
+	r.Outcome = outcome(r.Summary)
 	return r
+}
+
+// FromBroadcast builds the report of a Broadcast the controller ran.
+func FromBroadcast(b *v1alpha1.Broadcast) Report {
+	ref, _ := target.FromSpec(b.Spec.Target)
+	req := b.Spec.Request
+	spec := request.Spec{Method: req.Method, Path: req.Path, Body: []byte(req.Body)}
+	for name, value := range req.Headers {
+		spec.Headers = append(spec.Headers, request.Header{Name: name, Value: value})
+	}
+	r := newReport(b.Namespace, ref, spec)
+	r.Mode = "controller"
+	for _, p := range b.Status.Pods {
+		r.Pods = append(r.Pods, Pod{
+			Name: p.Name, UID: p.UID, IP: p.IP, Port: p.Port, Scheme: p.Scheme, State: p.State, Code: int(p.Code),
+			DurationMs: p.DurationMs, Attempts: int(p.Attempts), Error: p.Error, Body: p.Body,
+		})
+	}
+	s := b.Status.Summary
+	r.Summary = Summary{Targeted: int(s.Targeted), Succeeded: int(s.Succeeded), Failed: int(s.Failed), Gone: int(s.Gone)}
+	r.Outcome = outcome(r.Summary)
+	return r
+}
+
+func outcome(s Summary) Outcome {
+	switch {
+	case s.Failed == 0 && s.Succeeded > 0:
+		return OutcomeSucceeded
+	case s.Succeeded == 0:
+		return OutcomeFailed
+	}
+	return OutcomePartiallyFailed
 }
 
 // NewDryRunReport lists the pods that would be called. Pods that can't be called are Failed.

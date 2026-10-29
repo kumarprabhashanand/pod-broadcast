@@ -19,8 +19,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-	"k8s.io/client-go/kubernetes/fake"
-	k8stesting "k8s.io/client-go/testing"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+
+	"github.com/kumarprabhashanand/pod-broadcast/api/v1alpha1"
 
 	"github.com/kumarprabhashanand/pod-broadcast/internal/request"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
@@ -37,17 +40,12 @@ type recorder struct {
 type sent struct {
 	pod  string
 	port int32
-	path string
 	spec request.Spec
 }
 
 func (r *recorder) Do(_ context.Context, ep target.Endpoint, spec request.Spec) (request.Response, error) {
 	r.mu.Lock()
-	path := spec.Path
-	if ep.Path != "" {
-		path = ep.Path
-	}
-	r.requests = append(r.requests, sent{pod: ep.Pod.Name, port: ep.Port, path: path, spec: spec})
+	r.requests = append(r.requests, sent{pod: ep.Pod.Name, port: ep.Port, spec: spec})
 	answer := r.answers[ep.Pod.Name]
 	r.mu.Unlock()
 	if answer != nil {
@@ -63,13 +61,18 @@ func fakeCluster(tr request.Transport, objects ...runtime.Object) clusterFunc {
 // fakeClusterWithAccess answers access reviews for pods/proxy with allowed.
 func fakeClusterWithAccess(tr request.Transport, allowed bool, objects ...runtime.Object) clusterFunc {
 	return func(*genericclioptions.ConfigFlags) (*cluster, error) {
-		cs := fake.NewClientset(objects...)
-		cs.PrependReactor("create", "selfsubjectaccessreviews", func(a k8stesting.Action) (bool, runtime.Object, error) {
-			review := a.(k8stesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
-			review.Status.Allowed = allowed
-			return true, review, nil
-		})
-		return &cluster{client: cs, namespace: "shop", transport: tr}, nil
+		c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objects...).
+			WithStatusSubresource(&v1alpha1.Broadcast{}).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if review, ok := obj.(*authorizationv1.SelfSubjectAccessReview); ok {
+						review.Status.Allowed = allowed
+						return nil
+					}
+					return c.Create(ctx, obj, opts...)
+				},
+			}).Build()
+		return &cluster{client: c, namespace: "shop", transport: tr}, nil
 	}
 }
 
@@ -162,8 +165,6 @@ func TestRunWithoutCluster(t *testing.T) {
 		{name: "presets command", args: []string{"presets"}, wantStdout: "spring evict-caches [--cache NAME]  DELETE {base}/caches[/NAME]"},
 		{name: "invalid port", args: []string{"svc/orders", "--port", "70000", "-X", "GET", "/"}, wantCode: 2, wantStderr: `invalid port "70000"`},
 		{name: "invalid scheme", args: []string{"svc/orders", "--scheme", "ftp", "-X", "GET", "/"}, wantCode: 2, wantStderr: `invalid scheme "ftp"`},
-		{name: "method the proxy refuses", args: []string{"svc/orders", "-X", "BAN", "/"}, wantCode: 2, wantStderr: "method BAN can't be sent"},
-		{name: "authorization header", args: []string{"svc/orders", "-H", "Authorization: Bearer x", "-X", "GET", "/"}, wantCode: 2, wantStderr: "the Authorization header can't reach pods"},
 		{name: "bad header", args: []string{"svc/orders", "-H", "nocolon", "-X", "GET", "/"}, wantCode: 2, wantStderr: "must look like 'Name: value'"},
 		{name: "missing env var", args: []string{"svc/orders", "--header-from-env", "X-T=PB_TEST_UNSET", "-X", "GET", "/"}, wantCode: 2, wantStderr: "PB_TEST_UNSET"},
 		{name: "bad concurrency", args: []string{"svc/orders", "--concurrency", "0", "-X", "GET", "/"}, wantCode: 2, wantStderr: "--concurrency"},
@@ -368,6 +369,18 @@ func TestResolutionErrors(t *testing.T) {
 	}
 }
 
+func TestDirectModeRefusesWhatTheProxyCantPass(t *testing.T) {
+	for _, a := range [][]string{
+		{"svc/orders", "--port", "8081", "-X", "BAN", "/"},
+		{"svc/orders", "--port", "8081", "-H", "Authorization: Bearer x", "-X", "GET", "/"},
+	} {
+		r := runWith(t, nil, threePods(), a...)
+		if r.code != 2 || len(r.rec.requests) != 0 {
+			t.Errorf("%v: exit %d, %d requests, stderr %q", a, r.code, len(r.rec.requests), r.stderr)
+		}
+	}
+}
+
 func TestSecretAuthorizationHeaderIsRefused(t *testing.T) {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "auth", Namespace: "shop"},
@@ -379,30 +392,14 @@ func TestSecretAuthorizationHeaderIsRefused(t *testing.T) {
 	}
 }
 
-func TestPresetUsesTheManagementPortAndBasePath(t *testing.T) {
-	custom := ordersPod("orders-c", true)
-	custom.Annotations = map[string]string{target.AnnotationActuatorBasePath: "/manage"}
-	objects := append(ordersService(), ordersPod("orders-a", true), ordersPod("orders-b", true), custom)
-
-	r := runWith(t, nil, objects, "svc/orders", "spring", "set-log-level", "com.shop", "debug")
+func TestPresetUsesTheManagementPort(t *testing.T) {
+	r := runWith(t, nil, threePods(), "svc/orders", "spring", "set-log-level", "com.shop", "debug", "--base-path", "/manage")
 	if r.code != 0 {
 		t.Fatalf("exit code = %d, stderr %q", r.code, r.stderr)
 	}
-	paths := map[string]string{}
 	for _, s := range r.rec.requests {
-		if s.port != 8081 || s.spec.Method != http.MethodPost || string(s.spec.Body) != `{"configuredLevel":"DEBUG"}` {
+		if s.port != 8081 || s.spec.Method != http.MethodPost || s.spec.Path != "/manage/loggers/com.shop" || string(s.spec.Body) != `{"configuredLevel":"DEBUG"}` {
 			t.Errorf("request = %+v", s)
-		}
-		paths[s.pod] = s.path
-	}
-	if paths["orders-a"] != "/actuator/loggers/com.shop" || paths["orders-c"] != "/manage/loggers/com.shop" {
-		t.Errorf("paths = %v", paths)
-	}
-
-	r = runWith(t, nil, objects, "svc/orders", "spring", "health", "--dry-run")
-	for _, want := range []string{"GET /actuator/health", "PATH", "orders-a  10.0.0.1  8081  http    /actuator/health", "/manage/health"} {
-		if !strings.Contains(r.stdout, want) {
-			t.Errorf("dry run lacks %q:\n%s", want, r.stdout)
 		}
 	}
 }

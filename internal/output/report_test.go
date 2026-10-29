@@ -10,6 +10,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/kumarprabhashanand/pod-broadcast/internal/request"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
@@ -117,7 +118,7 @@ func TestJSONAndYAMLMatchTheSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	selector := target.Ref{Selector: "app=orders"}
+	selector := target.Ref{Selector: labels.SelectorFromSet(labels.Set{"app": "orders"})}
 	reports := map[string]Report{
 		"results":  NewReport("shop", svc, spec, results()),
 		"selector": NewReport("shop", selector, request.Spec{Method: "GET", Path: "/"}, results()),

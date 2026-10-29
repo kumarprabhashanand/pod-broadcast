@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -98,27 +97,4 @@ func TestSpringPresets(t *testing.T) {
 	}
 
 	run("spring", "refresh")
-}
-
-func TestSpringCustomBasePath(t *testing.T) {
-	ns := newNamespace(t)
-	custom := springPod("spring-custom")
-	custom.Annotations = map[string]string{"broadcast.kumarprabhashanand.github.io/actuator-base-path": "/manage"}
-	custom.Spec.Containers[0].Env = []corev1.EnvVar{{Name: "MANAGEMENT_ENDPOINTS_WEB_BASEPATH", Value: "/manage"}}
-	custom.Spec.Containers[0].ReadinessProbe.HTTPGet.Path = "/manage/health/readiness"
-	createPods(t, ns, springPod("spring-default"), custom)
-
-	r := broadcast(t, ns, "-l", "app=spring", "spring", "health")
-	if r.code != 0 || !strings.Contains(r.stdout, "2 targeted: 2 succeeded") {
-		t.Fatalf("want both base paths to work\n%s", r)
-	}
-	r = broadcast(t, ns, "-l", "app=spring", "spring", "health", "--dry-run")
-	if !strings.Contains(r.stdout, "/manage/health") || !strings.Contains(r.stdout, "/actuator/health") {
-		t.Errorf("dry run should show both paths\n%s", r)
-	}
-	start := time.Now()
-	r = broadcast(t, ns, "-l", "app=spring", "spring", "health", "--base-path", "/manage", "--retries", "0")
-	if r.code != 1 {
-		t.Errorf("--base-path /manage should fail on the default pod (took %s)\n%s", time.Since(start), r)
-	}
 }

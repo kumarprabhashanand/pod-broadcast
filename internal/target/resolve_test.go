@@ -10,15 +10,22 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/fake"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+func fakeReader(objects ...runtime.Object) client.Reader {
+	return fake.NewClientBuilder().WithScheme(clientgoscheme.Scheme).WithRuntimeObjects(objects...).Build()
+}
 
 var svcOrders = Ref{Kind: KindService, Name: "orders"}
 
 func resolve(t *testing.T, ref Ref, opts ResolveOptions, objects ...runtime.Object) Set {
 	t.Helper()
-	set, err := Resolve(context.Background(), fake.NewClientset(objects...), ns, ref, opts)
+	set, err := Resolve(context.Background(), fakeReader(objects...), ns, ref, opts)
 	if err != nil {
 		t.Fatalf("Resolve(%s): %v", ref, err)
 	}
@@ -135,7 +142,7 @@ func TestResolveWorkloads(t *testing.T) {
 }
 
 func TestResolveSelector(t *testing.T) {
-	set := resolve(t, Ref{Selector: "app=orders"}, ResolveOptions{},
+	set := resolve(t, Ref{Selector: labels.SelectorFromSet(ordersLabels)}, ResolveOptions{},
 		newPod("a"), newPod("x", withLabels(map[string]string{"app": "billing"})))
 	wantPods(t, set, "a")
 }
@@ -154,12 +161,11 @@ func TestResolveErrors(t *testing.T) {
 		{name: "missing service", ref: svcOrders, want: `service "orders" not found in namespace "shop"`},
 		{name: "missing deployment", ref: Ref{Kind: KindDeployment, Name: "orders"}, want: `deployment "orders" not found in namespace "shop"`},
 		{name: "empty workload selector", ref: Ref{Kind: KindDeployment, Name: "orders"}, objects: []runtime.Object{empty}, want: "matches every pod"},
-		{name: "invalid selector", ref: Ref{Selector: "app in (orders"}, want: "invalid selector"},
-		{name: "blank selector", ref: Ref{Selector: " "}, want: "matches every pod"},
+		{name: "empty selector", ref: Ref{Selector: labels.Everything()}, want: "match every pod"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := Resolve(context.Background(), fake.NewClientset(tt.objects...), ns, tt.ref, ResolveOptions{})
+			_, err := Resolve(context.Background(), fakeReader(tt.objects...), ns, tt.ref, ResolveOptions{})
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Errorf("Resolve(%s) error = %v, want it to contain %q", tt.ref, err, tt.want)
 			}

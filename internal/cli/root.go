@@ -12,12 +12,15 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kumarprabhashanand/pod-broadcast/api/v1alpha1"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/output"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/preset"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/request"
@@ -26,9 +29,9 @@ import (
 	"github.com/kumarprabhashanand/pod-broadcast/internal/version"
 )
 
-// cluster is what a broadcast needs from Kubernetes.
+// cluster is what a command needs from Kubernetes.
 type cluster struct {
-	client    kubernetes.Interface
+	client    client.Client
 	namespace string
 	transport request.Transport
 }
@@ -63,6 +66,11 @@ type rootOptions struct {
 	output          string
 	cache           string
 	basePath        string
+	mode            string
+	name            string
+	wait            bool
+	waitTimeout     time.Duration
+	forDuration     time.Duration
 }
 
 // Run executes the plugin with args (without the program name) and returns the process exit code.
@@ -93,8 +101,10 @@ func newRootCommand(streams genericiooptions.IOStreams, newCluster clusterFunc) 
 		Use:   "kubectl-broadcast TARGET (-X METHOD PATH | GROUP PRESET [ARGS])",
 		Short: "Send one HTTP request to every ready pod of a workload",
 		Long: `Send one HTTP request to every ready pod of a Service, workload or label selector,
-and report each pod's result. Requests go through the Kubernetes API server's pod
-proxy with your own credentials, so nothing needs to be installed in the cluster.
+and report each pod's result. By default requests go through the Kubernetes API
+server's pod proxy with your own credentials, so nothing needs to be installed in
+the cluster. With --mode controller, the request becomes a Broadcast object that
+the pod-broadcast controller runs.
 
 Exit codes: 0 every pod succeeded, 1 some pods failed, 2 usage error or no pods,
 3 every pod failed.`,
@@ -105,7 +115,10 @@ Exit codes: 0 every pod succeeded, 1 some pods failed, 2 usage error or no pods,
   kubectl broadcast -l app=orders --port 8081 -X GET /actuator/health -o json
 
   # Show the pods and the request without sending anything
-  kubectl broadcast deploy/orders --port 8081 -X POST /refresh --dry-run`,
+  kubectl broadcast deploy/orders --port 8081 -X POST /refresh --dry-run
+
+  # Let the controller run it, and wait for the result
+  kubectl broadcast svc/orders spring evict-caches --mode controller`,
 		Annotations:   map[string]string{cobra.CommandDisplayNameAnnotation: "kubectl broadcast"},
 		Args:          cobra.ArbitraryArgs,
 		SilenceUsage:  true,
@@ -121,28 +134,37 @@ Exit codes: 0 every pod succeeded, 1 some pods failed, 2 usage error or no pods,
 	cmd.SetOut(streams.Out)
 	cmd.SetErr(streams.ErrOut)
 
+	mode := os.Getenv("KUBECTL_BROADCAST_MODE")
+	if mode == "" {
+		mode = "direct"
+	}
 	f := cmd.Flags()
 	f.StringVarP(&o.selector, "selector", "l", "", "Label selector for the target pods, instead of TARGET")
-	f.StringVarP(&o.method, "request", "X", "", "HTTP method: GET, HEAD, POST, PUT, PATCH, DELETE or OPTIONS; needs a PATH argument")
+	f.StringVarP(&o.method, "request", "X", "", "HTTP method; needs a PATH argument")
 	f.StringVar(&o.port, "port", "", "Container port name or number (default: the pod annotation "+target.AnnotationPort+", then the Service's only port)")
 	f.StringVar(&o.scheme, "scheme", "", "http or https (default: the pod annotation "+target.AnnotationScheme+", then http)")
 	f.BoolVar(&o.includeNotReady, "include-not-ready", false, "Also call pods that aren't ready")
 	f.StringArrayVarP(&o.headers, "header", "H", nil, "Request header 'Name: value'; repeatable")
-	f.StringArrayVar(&o.envHeaders, "header-from-env", nil, "Request header Name=VAR with the value of environment variable VAR, never shown; repeatable")
-	f.StringArrayVar(&o.secretHeaders, "headers-from-secret", nil, "Secret whose keys become request headers, never shown; needs get on secrets; repeatable")
+	f.StringArrayVar(&o.envHeaders, "header-from-env", nil, "Request header Name=VAR with the value of environment variable VAR, never shown; direct mode only; repeatable")
+	f.StringArrayVar(&o.secretHeaders, "headers-from-secret", nil, "Secret whose keys become request headers, never shown; repeatable")
 	f.StringVarP(&o.data, "data", "d", "", "Request body, @FILE to read a file, or @- to read standard input")
 	f.IntVar(&o.concurrency, "concurrency", 10, "Pods called at the same time")
 	f.DurationVar(&o.timeout, "timeout", 5*time.Second, "Timeout for each attempt")
 	f.IntVar(&o.retries, "retries", 2, "Retries after a connection error, timeout or status 429, 500, 502, 503 or 504")
 	f.DurationVar(&o.backoff, "backoff", time.Second, "Base delay between retries; it doubles each time, with jitter")
 	f.StringVar(&o.successCodes, "success-codes", "2xx", "Status codes that count as success, as classes or codes, e.g. 2xx,404")
-	f.BoolVar(&o.dryRun, "dry-run", false, "Print the pods and the request without sending anything")
+	f.BoolVar(&o.dryRun, "dry-run", false, "Print the pods and the request without sending anything; direct mode only")
 	f.StringVarP(&o.output, "output", "o", "table", "Output format: table, json or yaml")
 	f.StringVar(&o.cache, "cache", "", "Cache to evict, for spring evict-caches")
-	f.StringVar(&o.basePath, "base-path", "", "Actuator base path for spring presets (default: the pod annotation "+target.AnnotationActuatorBasePath+", then "+preset.DefaultBasePath+")")
+	f.StringVar(&o.basePath, "base-path", "", "Actuator base path for spring presets (default "+preset.DefaultBasePath+")")
+	f.StringVar(&o.mode, "mode", mode, "direct, or controller to create a Broadcast object; KUBECTL_BROADCAST_MODE sets the default")
+	f.StringVar(&o.name, "name", "", "Name of the Broadcast in controller mode (default: generated from the target)")
+	f.BoolVar(&o.wait, "wait", true, "In controller mode, wait for the result; with --wait=false, print the Broadcast's name and return")
+	f.DurationVar(&o.waitTimeout, "wait-timeout", 5*time.Minute, "How long --wait waits")
+	f.DurationVar(&o.forDuration, "for", 0, "Keep applying the request to pods that become ready for this long, then revert it; implies --mode controller")
 	o.configFlags.AddFlags(cmd.PersistentFlags())
 
-	cmd.AddCommand(newVersionCommand(streams), newPresetsCommand(streams))
+	cmd.AddCommand(newVersionCommand(streams), newPresetsCommand(streams), newWaitCommand(o), newStopCommand(o))
 	return cmd
 }
 
@@ -160,7 +182,7 @@ func (o *rootOptions) broadcast(ctx context.Context, args []string) error {
 		return err
 	}
 	if call != nil {
-		choice.PresetPort = call.Port
+		choice.DefaultPort = call.Port
 	}
 	opts, err := o.executeOptions()
 	if err != nil {
@@ -169,62 +191,20 @@ func (o *rootOptions) broadcast(ctx context.Context, args []string) error {
 	if !slices.Contains(output.Formats, o.output) {
 		return fmt.Errorf("unknown output format %q: use %s", o.output, strings.Join(output.Formats, ", "))
 	}
-
+	if o.forDuration > 0 {
+		o.mode = "controller"
+	}
+	if o.mode != "direct" && o.mode != "controller" {
+		return fmt.Errorf("unknown mode %q: use direct or controller", o.mode)
+	}
 	cl, err := o.newCluster(o.configFlags)
 	if err != nil {
 		return err
 	}
-	for _, name := range o.secretHeaders {
-		secret, err := cl.client.CoreV1().Secrets(cl.namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		headers, err := request.SecretHeaders(secret)
-		if err != nil {
-			return err
-		}
-		spec.Headers = request.Merge(spec.Headers, headers)
+	if o.mode == "controller" {
+		return o.viaController(ctx, cl, inv, spec, call, choice)
 	}
-	if err := checkProxyHeaders(spec.Headers); err != nil {
-		return err
-	}
-
-	set, err := target.Resolve(ctx, cl.client, cl.namespace, inv.target, target.ResolveOptions{IncludeNotReady: o.includeNotReady})
-	if err != nil {
-		return err
-	}
-	if len(set.Pods) == 0 {
-		return noPodsError(inv.target, cl.namespace, set.NotReady, o.includeNotReady)
-	}
-	endpoints, err := target.Endpoints(set, choice)
-	if errors.Is(err, target.ErrNoPort) {
-		return noPortError(set.ServicePorts)
-	}
-	if err != nil {
-		return err
-	}
-	if call != nil {
-		call.ApplyBasePath(endpoints)
-	}
-
-	if o.dryRun {
-		return output.Write(o.streams.Out, o.output, output.NewDryRunReport(cl.namespace, inv.target, spec, endpoints))
-	}
-	if err := checkProxyAccess(ctx, cl.client, cl.namespace, spec.Method); err != nil {
-		return err
-	}
-	results, err := request.Run(ctx, cl.transport, endpoints, spec, opts)
-	if err != nil {
-		return fatalError(err, spec.Method)
-	}
-	report := output.NewReport(cl.namespace, inv.target, spec, results)
-	if err := output.Write(o.streams.Out, o.output, report); err != nil {
-		return err
-	}
-	if code := report.ExitCode(); code != output.ExitSucceeded {
-		return silentExit(code)
-	}
-	return nil
+	return o.direct(ctx, cl, inv, spec, choice, opts)
 }
 
 func (o *rootOptions) portChoice() (target.PortChoice, error) {
@@ -264,6 +244,7 @@ func (o *rootOptions) executeOptions() (request.Options, error) {
 }
 
 // spec builds the request from -X METHOD PATH or from a preset; call is set for presets.
+// Headers from Secrets are added by the mode that sends the request.
 func (o *rootOptions) spec(inv invocation) (spec request.Spec, call *preset.Call, err error) {
 	if inv.method != "" {
 		if o.cache != "" || o.basePath != "" {
@@ -287,9 +268,6 @@ func (o *rootOptions) spec(inv invocation) (spec request.Spec, call *preset.Call
 		}
 		spec, call = c.Spec, &c
 	}
-	if !slices.Contains(transport.ProxyMethods, spec.Method) {
-		return spec, nil, fmt.Errorf("method %s can't be sent: the API server's pod proxy passes only %s", spec.Method, strings.Join(transport.ProxyMethods, ", "))
-	}
 
 	var flagHeaders, envHeaders []request.Header
 	for _, s := range o.headers {
@@ -307,10 +285,7 @@ func (o *rootOptions) spec(inv invocation) (spec request.Spec, call *preset.Call
 		envHeaders = append(envHeaders, h)
 	}
 	spec.Headers = request.Merge(spec.Headers, flagHeaders, envHeaders)
-	if c := call; c != nil {
-		c.Spec = spec
-	}
-	return spec, call, checkProxyHeaders(spec.Headers)
+	return spec, call, nil
 }
 
 func (o *rootOptions) body() ([]byte, error) {
@@ -325,16 +300,12 @@ func (o *rootOptions) body() ([]byte, error) {
 	return nil, nil
 }
 
-// checkProxyHeaders refuses headers the pod would never receive. The API server deletes the
-// Authorization header after authenticating the caller.
-func checkProxyHeaders(headers []request.Header) error {
-	for _, h := range headers {
-		if strings.EqualFold(h.Name, "Authorization") {
-			return errors.New("the Authorization header can't reach pods: the API server removes it from proxied requests")
-		}
-	}
-	return nil
-}
+var scheme = func() *runtime.Scheme {
+	s := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(s))
+	utilruntime.Must(v1alpha1.AddToScheme(s))
+	return s
+}()
 
 func kubeCluster(f *genericclioptions.ConfigFlags) (*cluster, error) {
 	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
@@ -348,7 +319,7 @@ func kubeCluster(f *genericclioptions.ConfigFlags) (*cluster, error) {
 	config = rest.CopyConfig(config)
 	config.QPS, config.Burst = 50, 100
 	config.UserAgent = "kubectl-broadcast/" + version.String()
-	client, err := kubernetes.NewForConfig(config)
+	c, err := client.New(config, client.Options{Scheme: scheme})
 	if err != nil {
 		return nil, err
 	}
@@ -356,5 +327,5 @@ func kubeCluster(f *genericclioptions.ConfigFlags) (*cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &cluster{client: client, namespace: namespace, transport: proxy}, nil
+	return &cluster{client: c, namespace: namespace, transport: proxy}, nil
 }

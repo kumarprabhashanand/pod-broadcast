@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the end-to-end tests on a kind cluster.
+# Runs the end-to-end tests on a kind cluster, with the controller installed cluster-wide.
 #
 #   test/e2e/run.sh [NODE_IMAGE]
 #
@@ -17,11 +17,12 @@ if [[ -n ${DUAL_STACK:-} ]]; then
   CONFIG=test/e2e/kind-dual-stack.yaml
   export E2E_DUAL_STACK=1
 fi
-IMAGES=(pod-broadcast-echo:e2e pod-broadcast-spring:e2e)
+IMAGES=(pod-broadcast-echo:e2e pod-broadcast-spring:e2e pod-broadcast-controller:dev)
 
 if [[ -z ${SKIP_BUILD:-} ]]; then
   docker build -q -t pod-broadcast-echo:e2e test/apps/echo
   docker build -q -t pod-broadcast-spring:e2e test/apps/spring
+  docker build -q -t pod-broadcast-controller:dev .
 fi
 
 if ! kind get clusters | grep -qx "$CLUSTER"; then
@@ -31,5 +32,10 @@ if [[ -z ${KEEP_CLUSTER:-} ]]; then
   trap 'kind delete cluster --name "$CLUSTER"' EXIT
 fi
 kind load docker-image --name "$CLUSTER" "${IMAGES[@]}"
+
+KUBECTL=(kubectl --context "kind-$CLUSTER")
+"${KUBECTL[@]}" apply -f deploy/crds/ -f deploy/controller.yaml
+"${KUBECTL[@]}" -n pod-broadcast-system rollout restart deploy/pod-broadcast-controller
+"${KUBECTL[@]}" -n pod-broadcast-system rollout status deploy/pod-broadcast-controller --timeout 120s
 
 E2E_CONTEXT="kind-$CLUSTER" go test -tags e2e -count=1 -timeout 30m -parallel 3 -v ./test/e2e/

@@ -4,8 +4,12 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/labels"
+
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
 )
+
+var ordersSelector = labels.SelectorFromSet(labels.Set{"app": "orders"})
 
 func TestParseInvocation(t *testing.T) {
 	orders := target.Ref{Kind: target.KindService, Name: "orders"}
@@ -42,14 +46,14 @@ func TestParseInvocation(t *testing.T) {
 			args:     []string{"/actuator/health"},
 			selector: "app=orders",
 			method:   "GET",
-			want:     invocation{target: target.Ref{Selector: "app=orders"}, method: "GET", path: "/actuator/health"},
+			want:     invocation{target: target.Ref{Selector: ordersSelector}, method: "GET", path: "/actuator/health"},
 		},
 		{
 			name:     "selector with preset",
 			args:     []string{"spring", "health"},
 			selector: "app=orders",
 			want: invocation{
-				target: target.Ref{Selector: "app=orders"},
+				target: target.Ref{Selector: ordersSelector},
 				preset: presetCall{group: "spring", name: "health", args: []string{}},
 			},
 		},
@@ -62,6 +66,7 @@ func TestParseInvocation(t *testing.T) {
 		{name: "method with two paths", args: []string{"svc/orders", "/a", "/b"}, method: "GET", wantErr: true},
 		{name: "path without leading slash", args: []string{"svc/orders", "actuator/caches"}, method: "DELETE", wantErr: true},
 		{name: "selector without operation", selector: "app=orders", wantErr: true},
+		{name: "invalid selector", args: []string{"/x"}, selector: "app in (orders", method: "GET", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

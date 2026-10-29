@@ -1,0 +1,355 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: broadcasts.broadcast.kumarprabhashanand.github.io
+spec:
+  group: broadcast.kumarprabhashanand.github.io
+  names:
+    kind: Broadcast
+    listKind: BroadcastList
+    plural: broadcasts
+    singular: broadcast
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.mode
+      name: Mode
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.summary.targeted
+      name: Targeted
+      type: integer
+    - jsonPath: .status.summary.succeeded
+      name: Succeeded
+      type: integer
+    - jsonPath: .status.summary.failed
+      name: Failed
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Broadcast runs one HTTP request on every ready pod of a target.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: 'BroadcastSpec is immutable: to change a broadcast, create
+              a new one.'
+            properties:
+              duration:
+                description: Duration of a Continuous broadcast. Defaults to the policy's
+                  defaultDuration, else 1h.
+                type: string
+              execution:
+                default: {}
+                description: Execution's fields are pointers so that a zero value
+                  from a Go client still gets the default.
+                properties:
+                  backoff:
+                    default: 1s
+                    description: Base delay between retries; it doubles each time,
+                      with jitter.
+                    type: string
+                  concurrency:
+                    default: 10
+                    description: Pods called at the same time.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  retries:
+                    default: 2
+                    description: Retries after a connection error, a timeout or status
+                      429, 500, 502, 503 or 504.
+                    format: int32
+                    maximum: 10
+                    minimum: 0
+                    type: integer
+                  successCodes:
+                    default:
+                    - 2xx
+                    description: Status codes that count as success, as classes such
+                      as 2xx or codes such as 404.
+                    items:
+                      type: string
+                    type: array
+                  timeout:
+                    default: 5s
+                    description: Timeout for each attempt.
+                    type: string
+                type: object
+              mode:
+                default: Once
+                enum:
+                - Once
+                - Continuous
+                type: string
+              request:
+                properties:
+                  body:
+                    maxLength: 65536
+                    type: string
+                  defaultPort:
+                    description: DefaultPort is the port name used when neither port
+                      nor the pod's port annotation is set.
+                    type: string
+                  headers:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  headersFromSecrets:
+                    description: |-
+                      HeadersFromSecrets names Secrets whose keys become headers. Each must carry the label
+                      broadcast.kumarprabhashanand.github.io/use=true and be listed in a BroadcastPolicy.
+                    items:
+                      type: string
+                    type: array
+                  method:
+                    pattern: ^[A-Za-z]+$
+                    type: string
+                  path:
+                    description: Path and query.
+                    pattern: ^/\S*$
+                    type: string
+                  port:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: |-
+                      Port name or number. Defaults to the pod's port annotation, then defaultPort, then a
+                      Service's only port.
+                    x-kubernetes-int-or-string: true
+                  scheme:
+                    description: Defaults to the pod's scheme annotation, then http.
+                      Pod certificates aren't verified.
+                    enum:
+                    - http
+                    - https
+                    type: string
+                required:
+                - method
+                - path
+                type: object
+              revert:
+                description: |-
+                  Revert is sent to every pod the request reached when a Continuous broadcast ends. Port,
+                  scheme and headers from Secrets are the request's.
+                properties:
+                  body:
+                    maxLength: 65536
+                    type: string
+                  headers:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  method:
+                    pattern: ^[A-Za-z]+$
+                    type: string
+                  path:
+                    pattern: ^/\S*$
+                    type: string
+                required:
+                - method
+                - path
+                type: object
+              target:
+                description: Target selects the pods, in the broadcast's namespace.
+                properties:
+                  includeNotReady:
+                    description: IncludeNotReady also calls pods that aren't ready.
+                    type: boolean
+                  selector:
+                    description: |-
+                      A label selector is a label query over a set of resources. The result of matchLabels and
+                      matchExpressions are ANDed. An empty label selector matches all objects. A null
+                      label selector matches no objects.
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        items:
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
+                              items:
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                        x-kubernetes-list-type: atomic
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                          operator is "In", and the values array contains only "value". The requirements are ANDed.
+                        type: object
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  service:
+                    type: string
+                  workloadRef:
+                    properties:
+                      kind:
+                        enum:
+                        - Deployment
+                        - StatefulSet
+                        - DaemonSet
+                        - ReplicaSet
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    type: object
+                type: object
+                x-kubernetes-validations:
+                - message: set exactly one of service, workloadRef or selector
+                  rule: '[has(self.service), has(self.workloadRef), has(self.selector)].filter(x,
+                    x).size() == 1'
+              ttlSecondsAfterFinished:
+                description: Seconds to keep a finished broadcast; 0 deletes it at
+                  once. Defaults to the controller's --default-ttl.
+                format: int32
+                minimum: 0
+                type: integer
+            required:
+            - request
+            - target
+            type: object
+            x-kubernetes-validations:
+            - message: spec is immutable
+              rule: self == oldSelf
+            - message: duration and revert need mode Continuous
+              rule: self.mode == 'Continuous' || (!has(self.duration) && !has(self.revert))
+          status:
+            properties:
+              expiresAt:
+                format: date-time
+                type: string
+              finishedAt:
+                format: date-time
+                type: string
+              message:
+                description: Message explains a Rejected or Failed phase.
+                type: string
+              phase:
+                type: string
+              pods:
+                items:
+                  properties:
+                    attempts:
+                      format: int32
+                      type: integer
+                    body:
+                      description: Body is the start of the response, at most 256
+                        bytes.
+                      type: string
+                    code:
+                      format: int32
+                      type: integer
+                    durationMs:
+                      format: int64
+                      type: integer
+                    error:
+                      type: string
+                    ip:
+                      type: string
+                    name:
+                      type: string
+                    port:
+                      format: int32
+                      type: integer
+                    scheme:
+                      type: string
+                    state:
+                      type: string
+                    uid:
+                      type: string
+                  required:
+                  - name
+                  - state
+                  - uid
+                  type: object
+                type: array
+              startedAt:
+                format: date-time
+                type: string
+              summary:
+                properties:
+                  failed:
+                    format: int32
+                    type: integer
+                  gone:
+                    format: int32
+                    type: integer
+                  revertFailed:
+                    format: int32
+                    type: integer
+                  reverted:
+                    format: int32
+                    type: integer
+                  succeeded:
+                    format: int32
+                    type: integer
+                  targeted:
+                    format: int32
+                    type: integer
+                required:
+                - failed
+                - gone
+                - succeeded
+                - targeted
+                type: object
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

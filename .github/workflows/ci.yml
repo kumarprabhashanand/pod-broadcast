@@ -23,6 +23,7 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go mod tidy -diff
+      - run: make generate && git diff --exit-code
       - run: go build ./...
       - run: go test -race ./...
 

@@ -25,11 +25,10 @@ func newPresetsCommand(streams genericiooptions.IOStreams) *cobra.Command {
 				return err
 			}
 			_, err := fmt.Fprintf(streams.Out, `
-{base} is --base-path if given, else the pod annotation
-%s, else %s.
+{base} is --base-path if given, else %s.
 Spring presets call the container port named management, unless --port or the pod
 annotation %s says otherwise.
-`, target.AnnotationActuatorBasePath, preset.DefaultBasePath, target.AnnotationPort)
+`, preset.DefaultBasePath, target.AnnotationPort)
 			return err
 		},
 	}

@@ -8,8 +8,7 @@ import (
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/transport"
@@ -46,17 +45,17 @@ var proxyVerbs = map[string]string{
 // checkProxyAccess fails before any call when the caller may not use the pod proxy with this
 // method. A response to HEAD has no body, so the API server's refusal couldn't be recognized later.
 // When the review itself fails, the calls are left to report it.
-func checkProxyAccess(ctx context.Context, c kubernetes.Interface, ns, method string) error {
+func checkProxyAccess(ctx context.Context, c client.Client, ns, method string) error {
 	verb, ok := proxyVerbs[method]
 	if !ok {
 		return nil
 	}
-	review, err := c.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &authorizationv1.SelfSubjectAccessReview{
+	review := &authorizationv1.SelfSubjectAccessReview{
 		Spec: authorizationv1.SelfSubjectAccessReviewSpec{ResourceAttributes: &authorizationv1.ResourceAttributes{
 			Namespace: ns, Verb: verb, Resource: "pods", Subresource: "proxy",
 		}},
-	}, metav1.CreateOptions{})
-	if err != nil || review.Status.Allowed {
+	}
+	if err := c.Create(ctx, review); err != nil || review.Status.Allowed {
 		return nil
 	}
 	return fmt.Errorf("missing permission: %s requests need the %q verb on pods/proxy in namespace %q", method, verb, ns)
