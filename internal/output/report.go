@@ -72,6 +72,7 @@ type Pod struct {
 	IP         string `json:"ip"`
 	Port       int32  `json:"port"`
 	Scheme     string `json:"scheme"`
+	Path       string `json:"path,omitempty"`
 	State      string `json:"state"`
 	Code       int    `json:"code"`
 	DurationMs int64  `json:"durationMs"`
@@ -104,6 +105,7 @@ func podFor(ep target.Endpoint) Pod {
 		IP:     ep.Pod.Status.PodIP,
 		Port:   ep.Port,
 		Scheme: ep.Scheme,
+		Path:   ep.Path,
 	}
 }
 

@@ -15,6 +15,8 @@ const (
 	AnnotationDomain = "broadcast.kumarprabhashanand.github.io"
 	AnnotationPort   = AnnotationDomain + "/port"
 	AnnotationScheme = AnnotationDomain + "/scheme"
+
+	AnnotationActuatorBasePath = AnnotationDomain + "/actuator-base-path"
 )
 
 var (
@@ -28,7 +30,9 @@ type Endpoint struct {
 	Pod    *corev1.Pod
 	Port   int32
 	Scheme string
-	Err    error
+	// Path replaces the request path for this pod when set.
+	Path string
+	Err  error
 }
 
 // PortChoice holds an explicitly requested port and scheme, and a preset's default port name.

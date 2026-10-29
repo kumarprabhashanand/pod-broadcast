@@ -35,12 +35,17 @@ type recorder struct {
 type sent struct {
 	pod  string
 	port int32
+	path string
 	spec request.Spec
 }
 
 func (r *recorder) Do(_ context.Context, ep target.Endpoint, spec request.Spec) (request.Response, error) {
 	r.mu.Lock()
-	r.requests = append(r.requests, sent{pod: ep.Pod.Name, port: ep.Port, spec: spec})
+	path := spec.Path
+	if ep.Path != "" {
+		path = ep.Path
+	}
+	r.requests = append(r.requests, sent{pod: ep.Pod.Name, port: ep.Port, path: path, spec: spec})
 	answer := r.answers[ep.Pod.Name]
 	r.mu.Unlock()
 	if answer != nil {
@@ -134,7 +139,14 @@ func TestRunWithoutCluster(t *testing.T) {
 		{name: "unknown command", args: []string{"orders"}, wantCode: 2, wantStderr: `unknown command "orders"`},
 		{name: "unknown flag", args: []string{"svc/orders", "--bogus"}, wantCode: 2, wantStderr: "unknown flag: --bogus"},
 		{name: "missing operation", args: []string{"svc/orders", "-n", "shop", "--context", "dev"}, wantCode: 2, wantStderr: "missing operation"},
-		{name: "unknown preset", args: []string{"svc/orders", "spring", "evict-caches"}, wantCode: 2, wantStderr: `unknown preset "spring evict-caches"`},
+		{name: "unknown preset", args: []string{"svc/orders", "spring", "nope"}, wantCode: 2, wantStderr: `unknown preset "spring nope": run kubectl broadcast presets`},
+		{name: "preset with wrong arguments", args: []string{"svc/orders", "spring", "set-log-level", "com.shop"}, wantCode: 2, wantStderr: "usage: kubectl broadcast TARGET spring set-log-level LOGGER LEVEL"},
+		{name: "invalid log level", args: []string{"svc/orders", "spring", "set-log-level", "com.shop", "LOUD"}, wantCode: 2, wantStderr: `invalid log level "LOUD"`},
+		{name: "cache flag on another preset", args: []string{"svc/orders", "spring", "health", "--cache", "x"}, wantCode: 2, wantStderr: "--cache only applies to spring evict-caches"},
+		{name: "body with a preset", args: []string{"svc/orders", "spring", "refresh", "-d", "x"}, wantCode: 2, wantStderr: "-d can't be used with a preset"},
+		{name: "base path on a raw request", args: []string{"svc/orders", "--base-path", "/m", "-X", "GET", "/"}, wantCode: 2, wantStderr: "only apply to presets"},
+		{name: "invalid base path", args: []string{"svc/orders", "spring", "health", "--base-path", "m"}, wantCode: 2, wantStderr: "must start with /"},
+		{name: "presets command", args: []string{"presets"}, wantStdout: "spring evict-caches [--cache NAME]  DELETE {base}/caches[/NAME]"},
 		{name: "invalid port", args: []string{"svc/orders", "--port", "70000", "-X", "GET", "/"}, wantCode: 2, wantStderr: `invalid port "70000"`},
 		{name: "invalid scheme", args: []string{"svc/orders", "--scheme", "ftp", "-X", "GET", "/"}, wantCode: 2, wantStderr: `invalid scheme "ftp"`},
 		{name: "method the proxy refuses", args: []string{"svc/orders", "-X", "BAN", "/"}, wantCode: 2, wantStderr: "method BAN can't be sent"},
@@ -351,5 +363,33 @@ func TestSecretAuthorizationHeaderIsRefused(t *testing.T) {
 	r := runWith(t, nil, append(threePods(), secret), "svc/orders", "--port", "8081", "--headers-from-secret", "auth", "-X", "GET", "/")
 	if r.code != 2 || !strings.Contains(r.stderr, "the Authorization header can't reach pods") || len(r.rec.requests) != 0 {
 		t.Errorf("exit %d, stderr %q, %d requests", r.code, r.stderr, len(r.rec.requests))
+	}
+}
+
+func TestPresetUsesTheManagementPortAndBasePath(t *testing.T) {
+	custom := ordersPod("orders-c", true)
+	custom.Annotations = map[string]string{target.AnnotationActuatorBasePath: "/manage"}
+	objects := append(ordersService(), ordersPod("orders-a", true), ordersPod("orders-b", true), custom)
+
+	r := runWith(t, nil, objects, "svc/orders", "spring", "set-log-level", "com.shop", "debug")
+	if r.code != 0 {
+		t.Fatalf("exit code = %d, stderr %q", r.code, r.stderr)
+	}
+	paths := map[string]string{}
+	for _, s := range r.rec.requests {
+		if s.port != 8081 || s.spec.Method != http.MethodPost || string(s.spec.Body) != `{"configuredLevel":"DEBUG"}` {
+			t.Errorf("request = %+v", s)
+		}
+		paths[s.pod] = s.path
+	}
+	if paths["orders-a"] != "/actuator/loggers/com.shop" || paths["orders-c"] != "/manage/loggers/com.shop" {
+		t.Errorf("paths = %v", paths)
+	}
+
+	r = runWith(t, nil, objects, "svc/orders", "spring", "health", "--dry-run")
+	for _, want := range []string{"GET /actuator/health", "PATH", "orders-a  10.0.0.1  8081  http    /actuator/health", "/manage/health"} {
+		if !strings.Contains(r.stdout, want) {
+			t.Errorf("dry run lacks %q:\n%s", want, r.stdout)
+		}
 	}
 }

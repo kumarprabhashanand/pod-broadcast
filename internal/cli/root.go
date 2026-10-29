@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/kumarprabhashanand/pod-broadcast/internal/output"
+	"github.com/kumarprabhashanand/pod-broadcast/internal/preset"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/request"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/transport"
@@ -60,6 +61,8 @@ type rootOptions struct {
 	successCodes    string
 	dryRun          bool
 	output          string
+	cache           string
+	basePath        string
 }
 
 // Run executes the plugin with args (without the program name) and returns the process exit code.
@@ -135,9 +138,11 @@ Exit codes: 0 every pod succeeded, 1 some pods failed, 2 usage error or no pods,
 	f.StringVar(&o.successCodes, "success-codes", "2xx", "Status codes that count as success, as classes or codes, e.g. 2xx,404")
 	f.BoolVar(&o.dryRun, "dry-run", false, "Print the pods and the request without sending anything")
 	f.StringVarP(&o.output, "output", "o", "table", "Output format: table, json or yaml")
+	f.StringVar(&o.cache, "cache", "", "Cache to evict, for spring evict-caches")
+	f.StringVar(&o.basePath, "base-path", "", "Actuator base path for spring presets (default: the pod annotation "+target.AnnotationActuatorBasePath+", then "+preset.DefaultBasePath+")")
 	o.configFlags.AddFlags(cmd.PersistentFlags())
 
-	cmd.AddCommand(newVersionCommand(streams))
+	cmd.AddCommand(newVersionCommand(streams), newPresetsCommand(streams))
 	return cmd
 }
 
@@ -146,12 +151,16 @@ func (o *rootOptions) broadcast(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	if inv.method == "" {
-		return fmt.Errorf("unknown preset %q", inv.preset.group+" "+inv.preset.name)
+	spec, call, err := o.spec(inv)
+	if err != nil {
+		return err
 	}
 	choice, err := o.portChoice()
 	if err != nil {
 		return err
+	}
+	if call != nil {
+		choice.PresetPort = call.Port
 	}
 	opts, err := o.executeOptions()
 	if err != nil {
@@ -159,10 +168,6 @@ func (o *rootOptions) broadcast(ctx context.Context, args []string) error {
 	}
 	if !slices.Contains(output.Formats, o.output) {
 		return fmt.Errorf("unknown output format %q: use %s", o.output, strings.Join(output.Formats, ", "))
-	}
-	spec, err := o.spec(inv)
-	if err != nil {
-		return err
 	}
 
 	cl, err := o.newCluster(o.configFlags)
@@ -197,6 +202,9 @@ func (o *rootOptions) broadcast(ctx context.Context, args []string) error {
 	}
 	if err != nil {
 		return err
+	}
+	if call != nil {
+		call.ApplyBasePath(endpoints)
 	}
 
 	if o.dryRun {
@@ -252,36 +260,54 @@ func (o *rootOptions) executeOptions() (request.Options, error) {
 	return request.Options{Concurrency: o.concurrency, Timeout: o.timeout, Retries: o.retries, Backoff: o.backoff, SuccessCodes: codes}, nil
 }
 
-func (o *rootOptions) spec(inv invocation) (request.Spec, error) {
-	spec := request.Spec{Method: strings.ToUpper(inv.method), Path: inv.path}
-	if !slices.Contains(transport.ProxyMethods, spec.Method) {
-		return spec, fmt.Errorf("method %s can't be sent: the API server's pod proxy passes only %s", spec.Method, strings.Join(transport.ProxyMethods, ", "))
+// spec builds the request from -X METHOD PATH or from a preset; call is set for presets.
+func (o *rootOptions) spec(inv invocation) (spec request.Spec, call *preset.Call, err error) {
+	if inv.method != "" {
+		if o.cache != "" || o.basePath != "" {
+			return spec, nil, errors.New("--cache and --base-path only apply to presets")
+		}
+		spec = request.Spec{Method: strings.ToUpper(inv.method), Path: inv.path}
+		if spec.Body, err = o.body(); err != nil {
+			return spec, nil, err
+		}
+	} else {
+		if o.data != "" {
+			return spec, nil, errors.New("-d can't be used with a preset, which sets its own body; use -X METHOD PATH instead")
+		}
+		p, err := preset.Find(inv.preset.group, inv.preset.name)
+		if err != nil {
+			return spec, nil, err
+		}
+		c, err := p.Build(inv.preset.args, preset.Options{Cache: o.cache, BasePath: o.basePath})
+		if err != nil {
+			return spec, nil, err
+		}
+		spec, call = c.Spec, &c
 	}
+	if !slices.Contains(transport.ProxyMethods, spec.Method) {
+		return spec, nil, fmt.Errorf("method %s can't be sent: the API server's pod proxy passes only %s", spec.Method, strings.Join(transport.ProxyMethods, ", "))
+	}
+
 	var flagHeaders, envHeaders []request.Header
 	for _, s := range o.headers {
 		h, err := request.ParseHeader(s)
 		if err != nil {
-			return spec, err
+			return spec, nil, err
 		}
 		flagHeaders = append(flagHeaders, h)
 	}
 	for _, s := range o.envHeaders {
 		h, err := request.EnvHeader(s, os.LookupEnv)
 		if err != nil {
-			return spec, err
+			return spec, nil, err
 		}
 		envHeaders = append(envHeaders, h)
 	}
-	spec.Headers = request.Merge(flagHeaders, envHeaders)
-	if err := checkProxyHeaders(spec.Headers); err != nil {
-		return spec, err
+	spec.Headers = request.Merge(spec.Headers, flagHeaders, envHeaders)
+	if c := call; c != nil {
+		c.Spec = spec
 	}
-	body, err := o.body()
-	if err != nil {
-		return spec, err
-	}
-	spec.Body = body
-	return spec, nil
+	return spec, call, checkProxyHeaders(spec.Headers)
 }
 
 func (o *rootOptions) body() ([]byte, error) {

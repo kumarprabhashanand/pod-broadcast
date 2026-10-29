@@ -34,7 +34,7 @@ func writeTable(w io.Writer, r Report) error {
 		}
 		rows = append(rows, row)
 	}
-	if err := writeRows(w, rows); err != nil {
+	if err := WriteRows(w, rows); err != nil {
 		return err
 	}
 	_, err := fmt.Fprintln(w, summary(r.Summary))
@@ -60,15 +60,28 @@ func writeDryRun(w io.Writer, r Report) error {
 		return err
 	}
 
-	rows := []string{"POD\tIP\tPORT\tSCHEME\tERROR"}
+	showPath := slices.ContainsFunc(r.Pods, func(p Pod) bool { return p.Path != "" })
+	header := "POD\tIP\tPORT\tSCHEME"
+	if showPath {
+		header += "\tPATH"
+	}
+	rows := []string{header + "\tERROR"}
 	for _, p := range r.Pods {
 		port := ""
 		if p.Port != 0 {
 			port = strconv.Itoa(int(p.Port))
 		}
-		rows = append(rows, fmt.Sprintf("%s\t%s\t%s\t%s\t%s", p.Name, p.IP, port, p.Scheme, p.Error))
+		row := fmt.Sprintf("%s\t%s\t%s\t%s", p.Name, p.IP, port, p.Scheme)
+		if showPath {
+			path := p.Path
+			if path == "" {
+				path = r.Request.Path
+			}
+			row += "\t" + path
+		}
+		rows = append(rows, row+"\t"+p.Error)
 	}
-	if err := writeRows(w, rows); err != nil {
+	if err := WriteRows(w, rows); err != nil {
 		return err
 	}
 	callable := r.Summary.Targeted - r.Summary.Failed
@@ -76,8 +89,8 @@ func writeDryRun(w io.Writer, r Report) error {
 	return err
 }
 
-// writeRows aligns tab-separated rows into columns, without trailing spaces.
-func writeRows(w io.Writer, rows []string) error {
+// WriteRows aligns tab-separated rows into columns, without trailing spaces.
+func WriteRows(w io.Writer, rows []string) error {
 	var buf bytes.Buffer
 	tw := tabwriter.NewWriter(&buf, 0, 8, 2, ' ', 0)
 	for _, row := range rows {

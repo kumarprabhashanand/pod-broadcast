@@ -66,7 +66,11 @@ func (p *Proxy) URL(ep target.Endpoint, path string) string {
 }
 
 func (p *Proxy) Do(ctx context.Context, ep target.Endpoint, spec request.Spec) (request.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, spec.Method, p.URL(ep, spec.Path), bytes.NewReader(spec.Body))
+	path := spec.Path
+	if ep.Path != "" {
+		path = ep.Path
+	}
+	req, err := http.NewRequestWithContext(ctx, spec.Method, p.URL(ep, path), bytes.NewReader(spec.Body))
 	if err != nil {
 		return request.Response{}, &request.FatalError{Err: err}
 	}
