@@ -71,7 +71,7 @@ The exit code is 0 when no pod failed, 1 when some failed, 2 for a usage error o
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development and pull requests, and [SECURITY.md](SECURITY.md) to report a vulnerability.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and pull requests, [SECURITY.md](SECURITY.md) to report a vulnerability, and the [code of conduct](CODE_OF_CONDUCT.md) for how we work together.
 
 ## License
 

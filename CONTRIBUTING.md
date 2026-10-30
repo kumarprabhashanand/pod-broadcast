@@ -7,6 +7,7 @@ Issues and pull requests are welcome.
 - **Bug:** open an issue with the command, its output, and the versions of the plugin and Kubernetes.
 - **Larger change:** open an issue first, so the approach is agreed before the work.
 - **Security issue:** follow [SECURITY.md](SECURITY.md) instead of opening an issue.
+- **Conduct:** everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Development
 
