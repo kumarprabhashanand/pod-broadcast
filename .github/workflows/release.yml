@@ -42,7 +42,10 @@ jobs:
       - name: Publish the controller image
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker build -t "$IMAGE:$VERSION" .
+          docker build -t "$IMAGE:$VERSION" --build-arg "VERSION=$VERSION" \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            --label "org.opencontainers.image.licenses=Apache-2.0" .
           docker push "$IMAGE:$VERSION"
       - name: Prepare the manifests
         run: |

@@ -30,6 +30,8 @@ kubectl apply -f deploy/crds/
 kubectl apply -n shop -f deploy/controller-namespaced.yaml
 ```
 
+**Memory** grows with the cluster: the controller keeps the Pods, EndpointSlices, Services and workloads it can see in memory. In a large cluster, prefer the single-namespace install, or add a memory limit to the manifest after watching its usage.
+
 **Upgrade** by applying the same files again. **Uninstall** in this order: delete every Broadcast and wait until they are gone, so that `Continuous` ones revert; delete the controller manifest; delete the CRDs.
 
 ## Broadcast
@@ -134,3 +136,4 @@ The controller records an Event on the Broadcast at each phase change; `kubectl 
 | `--leader-elect` | `true` | Leader election, so extra replicas wait as standbys |
 | `--metrics-bind-address` | `:8080` | Prometheus metrics |
 | `--health-probe-bind-address` | `:8081` | `/healthz` and `/readyz` |
+| `--version` | | Print the version and exit; the version is also logged at startup |

@@ -6,7 +6,7 @@ What the plugin and the controller can access, and how to limit it. To report a 
 
 - The plugin acts with your own Kubernetes credentials and adds no access of its own. Calls go through the API server's pod proxy, which needs `pods/proxy` with the verb for each HTTP method; see [Permissions](rbac.md). Whoever may use `pods/proxy` on a pod can reach every port of that pod.
 - The API server removes the `Authorization` header from proxied requests, so the plugin refuses it. Pass credentials in another header, ideally with `--header-from-env` or `--headers-from-secret`.
-- Certificates of pods called over HTTPS aren't verified.
+- Certificates of pods called over HTTPS aren't verified, the same as for any request through the API server's pod proxy.
 - Values of headers from the environment or a Secret, and of headers with sensitive names, are shown as `<redacted>` in every output format, including `--dry-run`.
 
 ## Controller
@@ -26,7 +26,7 @@ What the plugin and the controller can access, and how to limit it. To report a 
 
 **Network.**
 
-- The controller calls pod IPs directly, never other hosts, and doesn't follow redirects. Certificates of pods called over HTTPS aren't verified.
+- The controller calls pod IPs directly, never other hosts, and doesn't follow redirects. Certificates of pods called over HTTPS aren't verified: pod certificates rarely name the pod's IP, and the API server's pod proxy doesn't verify them either.
 - If a pod is deleted and its IP goes to another pod between resolving the target and calling it, the request can reach the other pod. NetworkPolicies that admit the controller only to the pods it should call prevent this. Direct mode addresses pods by name through the API server.
 - Metrics are served over plain HTTP on port 8080, without authentication. They hold only counts of broadcasts and calls. A NetworkPolicy can limit who reaches them.
 

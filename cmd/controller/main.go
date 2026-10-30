@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	goruntime "runtime"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -17,11 +19,12 @@ import (
 	"github.com/kumarprabhashanand/pod-broadcast/api/v1alpha1"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/controller"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/transport"
+	"github.com/kumarprabhashanand/pod-broadcast/internal/version"
 )
 
 func main() {
 	var namespace, metricsAddr, probeAddr string
-	var requirePolicy, leaderElect bool
+	var requirePolicy, leaderElect, showVersion bool
 	var defaultTTL, maxDuration time.Duration
 	flag.StringVar(&namespace, "namespace", "", "Run broadcasts in this namespace only; empty means all namespaces")
 	flag.BoolVar(&requirePolicy, "require-policy", true, "Reject broadcasts in namespaces without a BroadcastPolicy")
@@ -30,9 +33,15 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "Address of the Prometheus metrics endpoint")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "Address of the health probes")
 	flag.BoolVar(&leaderElect, "leader-elect", true, "Use leader election, so extra replicas wait as standbys")
+	flag.BoolVar(&showVersion, "version", false, "Print the version and exit")
 	flag.Parse()
+	if showVersion {
+		fmt.Printf("pod-broadcast-controller %s (%s %s/%s)\n", version.String(), goruntime.Version(), goruntime.GOOS, goruntime.GOARCH)
+		return
+	}
 	ctrl.SetLogger(zap.New())
 	log := ctrl.Log.WithName("setup")
+	log.Info("starting", "version", version.String())
 
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
