@@ -16,8 +16,8 @@ Nothing tells the plugin which port to call. Pass `--port`, or set the annotatio
 **`missing permission: POST requests need the "create" verb on pods/proxy in namespace "shop"`**
 You may read the pods but not call them with this method; no pod was called. See [Permissions](rbac.md). Errors such as `services "orders" is forbidden` mean you can't read the target itself.
 
-**`method BAN can't be sent: the API server's pod proxy passes only GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS`**
-The API server refuses other methods on the pod proxy.
+**`method OPTIONS can't be sent in direct mode, which sends only GET, HEAD, POST, PUT, PATCH, DELETE`**
+Other methods either don't pass the API server's pod proxy, or need permission for every verb on it. The controller sends any method (`--mode controller`).
 
 **`the Authorization header can't reach pods`**
 The API server removes the `Authorization` header from proxied requests, so the pod would never see it. If the application accepts another header, such as an API key header, use that one, ideally with `--header-from-env` or `--headers-from-secret`.

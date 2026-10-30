@@ -369,9 +369,10 @@ func TestResolutionErrors(t *testing.T) {
 	}
 }
 
-func TestDirectModeRefusesWhatTheProxyCantPass(t *testing.T) {
+func TestDirectModeRefusesUnsupportedRequests(t *testing.T) {
 	for _, a := range [][]string{
 		{"svc/orders", "--port", "8081", "-X", "BAN", "/"},
+		{"svc/orders", "--port", "8081", "-X", "OPTIONS", "/"},
 		{"svc/orders", "--port", "8081", "-H", "Authorization: Bearer x", "-X", "GET", "/"},
 	} {
 		r := runWith(t, nil, threePods(), a...)

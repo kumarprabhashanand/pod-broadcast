@@ -20,7 +20,7 @@ import (
 // direct calls the pods itself, through the API server's pod proxy.
 func (o *rootOptions) direct(ctx context.Context, cl *cluster, inv invocation, spec request.Spec, choice target.PortChoice, opts request.Options) error {
 	if !slices.Contains(transport.ProxyMethods, spec.Method) {
-		return fmt.Errorf("method %s can't be sent: the API server's pod proxy passes only %s", spec.Method, strings.Join(transport.ProxyMethods, ", "))
+		return fmt.Errorf("method %s can't be sent in direct mode, which sends only %s", spec.Method, strings.Join(transport.ProxyMethods, ", "))
 	}
 	for _, name := range o.secretHeaders {
 		var secret corev1.Secret

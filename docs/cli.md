@@ -33,7 +33,7 @@ All targets are in one namespace: the one from `-n`, or your kubeconfig context'
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `-X`, `--request` | | HTTP method. Needs a PATH argument, which may include a query string. Direct mode sends `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTIONS`; controller mode sends any method. |
+| `-X`, `--request` | | HTTP method. Needs a PATH argument, which may include a query string. Direct mode sends `GET`, `HEAD`, `POST`, `PUT`, `PATCH` and `DELETE`, the methods RBAC can grant on the pod proxy; controller mode sends any method. |
 | `-H`, `--header` | | Header as `'Name: value'`; repeatable. A later header replaces an earlier one with the same name. |
 | `--header-from-env` | | Header as `Name=VAR`, with the value of environment variable `VAR`; repeatable. The value is never shown. Direct mode only. |
 | `--headers-from-secret` | | A Secret whose keys become headers; repeatable. Values are never shown. Needs `get` on `secrets`. |

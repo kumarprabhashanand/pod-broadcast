@@ -16,10 +16,10 @@ import (
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
 )
 
-// ProxyMethods are the methods the API server's pod proxy passes on.
+// ProxyMethods are the methods direct mode sends: those the API server's pod proxy passes on and
+// maps to an RBAC verb. Other methods, such as OPTIONS, map to no verb, so only a "*" rule allows them.
 var ProxyMethods = []string{
-	http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut,
-	http.MethodPatch, http.MethodDelete, http.MethodOptions,
+	http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete,
 }
 
 // ForbiddenError means the caller may not use the pod proxy for this method.
