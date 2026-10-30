@@ -62,16 +62,12 @@ The exit code is 0 when no pod failed, 1 when some failed, 2 for a usage error o
 - [Controller](docs/controller.md): install, Broadcast and BroadcastPolicy objects, Continuous mode
 - [Permissions](docs/rbac.md): the RBAC rules a direct-mode user needs, with an example Role
 - [Troubleshooting](docs/troubleshooting.md): what each error means and how to fix it
+- [Security](docs/security.md): what the plugin and the controller can access, and how to limit it
 - [Testing](docs/testing.md): what is tested, how, where it has run, and the results
 
-## Development
+## Contributing
 
-```sh
-make test       # unit tests
-make lint       # golangci-lint
-make generate   # deepcopy code and CRDs after changing api/
-make e2e        # end-to-end tests on a kind cluster; needs Docker and kind
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and pull requests, and [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## License
 

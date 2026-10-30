@@ -14,3 +14,17 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+  - package-ecosystem: docker
+    directories: ["/", "/test/apps/echo", "/test/apps/spring"]
+    schedule:
+      interval: monthly
+    groups:
+      docker:
+        patterns: ["*"]
+  - package-ecosystem: maven
+    directory: /test/apps/spring
+    schedule:
+      interval: monthly
+    groups:
+      maven:
+        patterns: ["*"]
