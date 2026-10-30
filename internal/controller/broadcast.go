@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -30,11 +31,13 @@ import (
 const (
 	finalizer   = v1alpha1.GroupName + "/revert"
 	secretLabel = v1alpha1.GroupName + "/use"
-	// maxPods keeps a Broadcast's status far below etcd's request size limit.
-	maxPods   = 1000
-	chunk     = 50
-	bodyBytes = 256
+	chunk       = 50
+	bodyBytes   = 256
 )
+
+// maxPods keeps a Broadcast's status far below etcd's request size limit: it caps both the pods of
+// one pass and the entries a Continuous broadcast collects over its life. Tests lower it.
+var maxPods = 1000
 
 var (
 	finishedTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -123,7 +126,7 @@ func (r *BroadcastReconciler) runOnce(ctx context.Context, b *v1alpha1.Broadcast
 	if b.Status.Phase == v1alpha1.Pending {
 		now := metav1.Now()
 		b.Status.StartedAt = &now
-		b.Status.Phase = v1alpha1.Running
+		setPhase(b, v1alpha1.Running)
 		if err := r.Status().Update(ctx, b); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -186,6 +189,14 @@ func (r *BroadcastReconciler) apply(ctx context.Context, b *v1alpha1.Broadcast) 
 		}
 		todo = notCalled(eps, b.Status.Pods)
 	}
+	if len(b.Status.Pods)+len(todo) > maxPods {
+		if err := r.dropGone(ctx, b); err != nil {
+			return ctrl.Result{}, err
+		}
+		if len(b.Status.Pods)+len(todo) > maxPods {
+			return r.revert(ctx, b, fmt.Sprintf("more than %d pods to keep track of; a Broadcast keeps at most %d", maxPods, maxPods))
+		}
+	}
 	if len(todo) > 0 {
 		c, rejection, err := r.requests(ctx, b)
 		if err != nil {
@@ -199,7 +210,7 @@ func (r *BroadcastReconciler) apply(ctx context.Context, b *v1alpha1.Broadcast) 
 		}
 	}
 	if b.Status.Phase != v1alpha1.Active {
-		b.Status.Phase = v1alpha1.Active
+		setPhase(b, v1alpha1.Active)
 		if err := r.Status().Update(ctx, b); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -217,7 +228,7 @@ func (r *BroadcastReconciler) revert(ctx context.Context, b *v1alpha1.Broadcast,
 		return r.done(ctx, b)
 	}
 	if b.Status.Phase != v1alpha1.Reverting {
-		b.Status.Phase = v1alpha1.Reverting
+		setPhase(b, v1alpha1.Reverting)
 		if message != "" {
 			b.Status.Message = message
 		}
@@ -281,11 +292,11 @@ func (r *BroadcastReconciler) setFinalizer(ctx context.Context, b *v1alpha1.Broa
 }
 
 func (r *BroadcastReconciler) finish(ctx context.Context, b *v1alpha1.Broadcast, phase v1alpha1.Phase, message string) (ctrl.Result, error) {
-	b.Status.Phase = phase
 	if message != "" {
 		b.Status.Message = message
 	}
-	b.Status.Summary = summarize(b.Status.Pods)
+	setPhase(b, phase)
+	b.Status.Summary = summarize(&b.Status)
 	now := metav1.Now()
 	b.Status.FinishedAt = &now
 	if err := r.Status().Update(ctx, b); err != nil {
@@ -294,6 +305,16 @@ func (r *BroadcastReconciler) finish(ctx context.Context, b *v1alpha1.Broadcast,
 	finishedTotal.WithLabelValues(string(phase)).Inc()
 	r.event(b, message)
 	return r.done(ctx, b)
+}
+
+// setPhase sets the phase and the Complete condition that mirrors it.
+func setPhase(b *v1alpha1.Broadcast, phase v1alpha1.Phase) {
+	b.Status.Phase = phase
+	c := metav1.Condition{Type: v1alpha1.ConditionComplete, Status: metav1.ConditionFalse, Reason: string(phase), ObservedGeneration: b.Generation}
+	if phase.Finished() {
+		c.Status, c.Message = metav1.ConditionTrue, b.Status.Message
+	}
+	meta.SetStatusCondition(&b.Status.Conditions, c)
 }
 
 func (r *BroadcastReconciler) event(b *v1alpha1.Broadcast, note string) {
@@ -437,12 +458,36 @@ func (r *BroadcastReconciler) call(ctx context.Context, b *v1alpha1.Broadcast, e
 		for _, res := range results {
 			b.Status.Pods = upsert(b.Status.Pods, r.podResult(ctx, res, revert))
 		}
-		b.Status.Summary = summarize(b.Status.Pods)
+		b.Status.Summary = summarize(&b.Status)
 		if err := r.Status().Update(ctx, b); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// dropGone removes the entries of pods that no longer exist, so that a Continuous broadcast on a
+// workload that keeps replacing its pods stays within maxPods. They still count as gone.
+func (r *BroadcastReconciler) dropGone(ctx context.Context, b *v1alpha1.Broadcast) error {
+	kept := b.Status.Pods[:0]
+	for _, p := range b.Status.Pods {
+		var pod corev1.Pod
+		err := r.Get(ctx, client.ObjectKey{Namespace: b.Namespace, Name: p.Name}, &pod)
+		switch {
+		case apierrors.IsNotFound(err) || (err == nil && string(pod.UID) != p.UID):
+			b.Status.DroppedPods++
+		case err != nil:
+			return err
+		default:
+			kept = append(kept, p)
+		}
+	}
+	if len(kept) == len(b.Status.Pods) {
+		return nil
+	}
+	b.Status.Pods = kept
+	b.Status.Summary = summarize(&b.Status)
+	return r.Status().Update(ctx, b)
 }
 
 func (r *BroadcastReconciler) podResult(ctx context.Context, res request.Result, revert bool) v1alpha1.PodResult {
@@ -512,9 +557,9 @@ func upsert(pods []v1alpha1.PodResult, p v1alpha1.PodResult) []v1alpha1.PodResul
 	return append(pods, p)
 }
 
-func summarize(pods []v1alpha1.PodResult) v1alpha1.Summary {
-	s := v1alpha1.Summary{Targeted: int32(len(pods))}
-	for _, p := range pods {
+func summarize(st *v1alpha1.BroadcastStatus) v1alpha1.Summary {
+	s := v1alpha1.Summary{Targeted: int32(len(st.Pods)) + st.DroppedPods, Gone: st.DroppedPods}
+	for _, p := range st.Pods {
 		switch p.State {
 		case v1alpha1.PodSucceeded:
 			s.Succeeded++

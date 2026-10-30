@@ -8,9 +8,13 @@ metadata:
 spec:
   group: broadcast.prabhash.net
   names:
+    categories:
+    - pod-broadcast
     kind: BroadcastPolicy
     listKind: BroadcastPolicyList
     plural: broadcastpolicies
+    shortNames:
+    - bcp
     singular: broadcastpolicy
   scope: Namespaced
   versions:
@@ -37,21 +41,28 @@ spec:
           metadata:
             type: object
           spec:
+            description: BroadcastPolicySpec says what broadcasts in the namespace
+              may call.
             properties:
               allow:
                 description: |-
                   A broadcast passes when its request, and its revert, each match one rule on target, port,
                   method and path together.
                 items:
+                  description: Rule allows a set of methods and paths on a set of
+                    targets and ports.
                   properties:
                     methods:
+                      description: HTTP methods, compared without regard to case.
                       items:
                         type: string
                       minItems: 1
                       type: array
                     paths:
-                      description: RE2 patterns matched against the whole path and
-                        query.
+                      description: |-
+                        RE2 patterns matched against the whole path and query. Paths with "." or ".." segments, ";",
+                        a backslash, or percent-encoded ".", "/", backslash or "%" are refused, so that no server reads
+                        them as a path the pattern doesn't allow.
                       items:
                         type: string
                       minItems: 1
@@ -82,16 +93,30 @@ spec:
                 minItems: 1
                 type: array
               limits:
+                description: Limits caps execution settings and durations; with several
+                  policies, the strictest wins.
                 properties:
                   defaultDuration:
+                    description: DefaultDuration of a Continuous broadcast that sets
+                      none.
                     type: string
+                    x-kubernetes-validations:
+                    - message: defaultDuration must be positive
+                      rule: duration(self) > duration('0s')
                   maxConcurrency:
+                    description: MaxConcurrency is the highest execution.concurrency
+                      allowed.
                     format: int32
                     minimum: 1
                     type: integer
                   maxDuration:
+                    description: MaxDuration is the longest Continuous broadcast allowed.
                     type: string
+                    x-kubernetes-validations:
+                    - message: maxDuration must be positive
+                      rule: duration(self) > duration('0s')
                   maxRetries:
+                    description: MaxRetries is the highest execution.retries allowed.
                     format: int32
                     minimum: 0
                     type: integer

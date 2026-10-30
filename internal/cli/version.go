@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"runtime"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -16,7 +15,7 @@ func newVersionCommand(streams genericiooptions.IOStreams) *cobra.Command {
 		Short: "Print the plugin version",
 		Args:  cobra.NoArgs,
 		Run: func(*cobra.Command, []string) {
-			fmt.Fprintf(streams.Out, "kubectl-broadcast %s (%s %s/%s)\n", version.String(), runtime.Version(), runtime.GOOS, runtime.GOARCH)
+			fmt.Fprintln(streams.Out, version.Line("kubectl-broadcast"))
 		},
 	}
 }

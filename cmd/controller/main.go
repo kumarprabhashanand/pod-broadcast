@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	goruntime "runtime"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,12 +33,14 @@ func main() {
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "Address of the health probes")
 	flag.BoolVar(&leaderElect, "leader-elect", true, "Use leader election, so extra replicas wait as standbys")
 	flag.BoolVar(&showVersion, "version", false, "Print the version and exit")
+	logOpts := zap.Options{}
+	logOpts.BindFlags(flag.CommandLine)
 	flag.Parse()
 	if showVersion {
-		fmt.Printf("pod-broadcast-controller %s (%s %s/%s)\n", version.String(), goruntime.Version(), goruntime.GOOS, goruntime.GOARCH)
+		fmt.Println(version.Line("pod-broadcast-controller"))
 		return
 	}
-	ctrl.SetLogger(zap.New())
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&logOpts)))
 	log := ctrl.Log.WithName("setup")
 	log.Info("starting", "version", version.String())
 

@@ -8,9 +8,13 @@ metadata:
 spec:
   group: broadcast.prabhash.net
   names:
+    categories:
+    - pod-broadcast
     kind: Broadcast
     listKind: BroadcastList
     plural: broadcasts
+    shortNames:
+    - bc
     singular: broadcast
   scope: Namespaced
   versions:
@@ -56,16 +60,20 @@ spec:
           metadata:
             type: object
           spec:
-            description: 'BroadcastSpec is immutable: to change a broadcast, create
-              a new one.'
+            description: 'BroadcastSpec says what to call and how. It is immutable:
+              to change a broadcast, create a new one.'
             properties:
               duration:
                 description: Duration of a Continuous broadcast. Defaults to the policy's
                   defaultDuration, else 1h.
                 type: string
+                x-kubernetes-validations:
+                - message: duration must be positive
+                  rule: duration(self) > duration('0s')
               execution:
                 default: {}
-                description: Execution sets how the pods are called.
+                description: Execution sets concurrency, timeouts, retries and success
+                  codes.
                 properties:
                   backoff:
                     default: 1s
@@ -101,13 +109,18 @@ spec:
                 type: object
               mode:
                 default: Once
+                description: |-
+                  Mode is Once, to call the ready pods once, or Continuous, to also call pods that become ready
+                  until the duration ends, then send the revert.
                 enum:
                 - Once
                 - Continuous
                 type: string
               request:
+                description: Request is sent to every pod of the target.
                 properties:
                   body:
+                    description: Body is sent as it is, at most 64 KiB.
                     maxLength: 65536
                     type: string
                   defaultPort:
@@ -117,6 +130,9 @@ spec:
                   headers:
                     additionalProperties:
                       type: string
+                    description: |-
+                      Headers are sent as they are, and anyone who can read the Broadcast sees them. Put secret
+                      values in headersFromSecrets instead.
                     type: object
                   headersFromSecrets:
                     description: |-
@@ -126,10 +142,13 @@ spec:
                       type: string
                     type: array
                   method:
+                    description: Method is the HTTP method, such as GET or POST.
                     pattern: ^[A-Za-z]+$
                     type: string
                   path:
-                    description: Path and query.
+                    description: |-
+                      Path and query. Where a BroadcastPolicy applies, the path can't have "." or ".." segments,
+                      ";", a backslash, or percent-encoded ".", "/", backslash or "%".
                     pattern: ^/\S*$
                     type: string
                   port:
@@ -141,8 +160,9 @@ spec:
                       Service's only port.
                     x-kubernetes-int-or-string: true
                   scheme:
-                    description: Defaults to the pod's scheme annotation, then http.
-                      Pod certificates aren't verified.
+                    description: |-
+                      Scheme is http or https. Defaults to the pod's scheme annotation, then http. Pod certificates
+                      aren't verified.
                     enum:
                     - http
                     - https
@@ -167,6 +187,7 @@ spec:
                     pattern: ^[A-Za-z]+$
                     type: string
                   path:
+                    description: Path and query, with the same rules as the request's.
                     pattern: ^/\S*$
                     type: string
                 required:
@@ -174,16 +195,14 @@ spec:
                 - path
                 type: object
               target:
-                description: Target selects the pods, in the broadcast's namespace.
+                description: Target selects the pods to call.
                 properties:
                   includeNotReady:
                     description: IncludeNotReady also calls pods that aren't ready.
                     type: boolean
                   selector:
-                    description: |-
-                      A label selector is a label query over a set of resources. The result of matchLabels and
-                      matchExpressions are ANDed. An empty label selector matches all objects. A null
-                      label selector matches no objects.
+                    description: Selector calls the pods matching these labels. It
+                      can't be empty.
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector
@@ -229,8 +248,12 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   service:
+                    description: Service calls the pods behind this Service, taken
+                      from its EndpointSlices.
                     type: string
                   workloadRef:
+                    description: WorkloadRef calls the pods matching a workload's
+                      selector.
                     properties:
                       kind:
                         enum:
@@ -266,20 +289,93 @@ spec:
             - message: duration and revert need mode Continuous
               rule: self.mode == 'Continuous' || (!has(self.duration) && !has(self.revert))
           status:
+            description: BroadcastStatus is what the controller has done so far.
             properties:
+              conditions:
+                description: Conditions holds Complete.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              droppedPods:
+                description: |-
+                  DroppedPods counts pods that went away and whose entries were removed from pods to keep the
+                  status small. They count as gone in the summary.
+                format: int32
+                type: integer
               expiresAt:
+                description: ExpiresAt is when a Continuous broadcast ends.
                 format: date-time
                 type: string
               finishedAt:
                 format: date-time
                 type: string
               message:
-                description: Message explains a Rejected or Failed phase.
+                description: Message explains a Rejected or Failed phase, or why a
+                  Continuous broadcast ended.
                 type: string
               phase:
+                description: 'Phase is where a broadcast is in its life. The empty
+                  phase is Pending: not looked at yet.'
                 type: string
               pods:
+                description: Pods holds one entry per pod called, at most 1,000.
                 items:
+                  description: PodResult is the outcome on one pod.
                   properties:
                     attempts:
                       format: int32
@@ -319,6 +415,7 @@ spec:
                 format: date-time
                 type: string
               summary:
+                description: Summary counts the pods by result.
                 properties:
                   failed:
                     format: int32
