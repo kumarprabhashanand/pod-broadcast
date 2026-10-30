@@ -69,6 +69,14 @@ func Check(policies []v1alpha1.BroadcastPolicy, b *v1alpha1.Broadcast, requirePo
 	if err != nil {
 		return d, err
 	}
+	if err := unambiguous(spec.Request.Path); err != nil {
+		return d, err
+	}
+	if r := spec.Revert; r != nil {
+		if err := unambiguous(r.Path); err != nil {
+			return d, err
+		}
+	}
 	if d.request, err = matching(rules, ref, spec.Request.Method, spec.Request.Path); err != nil {
 		return d, err
 	}
@@ -147,6 +155,25 @@ func allows(r v1alpha1.Rule, ref target.Ref, method, path string) (bool, error) 
 		}
 	}
 	return false, nil
+}
+
+// unambiguous refuses paths that a server may read as another path than the one a rule matched:
+// "/actuator/caches/../shutdown" matches "/actuator/caches(/.*)?", and many servers resolve it to
+// /actuator/shutdown. The query isn't checked, since servers don't resolve paths in it.
+func unambiguous(raw string) error {
+	path, _, _ := strings.Cut(raw, "?")
+	for _, seg := range strings.Split(path, "/") {
+		if seg == "." || seg == ".." {
+			return fmt.Errorf("path %q has a %q segment, which servers may resolve to a path no BroadcastPolicy rule allows", raw, seg)
+		}
+	}
+	lower := strings.ToLower(path)
+	for _, s := range []string{"%2e", "%2f", "%5c", "%25", "\\", ";"} {
+		if strings.Contains(lower, s) {
+			return fmt.Errorf("path %q contains %q, which servers may read as a path no BroadcastPolicy rule allows", raw, s)
+		}
+	}
+	return nil
 }
 
 func matchesTarget(entry string, ref target.Ref) bool {

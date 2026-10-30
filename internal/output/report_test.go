@@ -86,6 +86,18 @@ orders-c  Gone             0ms   1         pod is gone
 	}
 }
 
+func TestTableHidesControlCharacters(t *testing.T) {
+	res := results()[:1]
+	res[0].Body = []byte("ok \x1b[2J\x1b]0;title\x07 done")
+	var buf bytes.Buffer
+	if err := Write(&buf, "table", NewReport("shop", svc, spec, res)); err != nil {
+		t.Fatal(err)
+	}
+	if strings.ContainsAny(buf.String(), "\x1b\x07") || !strings.Contains(buf.String(), "ok ?[2J?]0;title? done") {
+		t.Errorf("table passes control characters through:\n%q", buf.String())
+	}
+}
+
 func TestTableWithoutBodies(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewReport("shop", svc, spec, results()[:1])

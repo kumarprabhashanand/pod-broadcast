@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/kumarprabhashanand/pod-broadcast/schemas/output-v1.json",
+  "$id": "https://raw.githubusercontent.com/kumarprabhashanand/pod-broadcast/main/schemas/output-v1.json",
   "title": "kubectl broadcast output, schema v1",
   "type": "object",
   "required": ["schemaVersion", "mode", "dryRun", "target", "request", "outcome", "summary", "pods"],
@@ -62,7 +62,7 @@
           "port": { "type": "integer", "minimum": 0, "maximum": 65535 },
           "scheme": { "enum": ["", "http", "https"] },
           "state": { "enum": ["Succeeded", "Failed", "Gone", "Pending", "Reverted", "RevertFailed"] },
-          "code": { "type": "integer", "minimum": 0, "maximum": 599 },
+          "code": { "type": "integer", "minimum": 0, "maximum": 999 },
           "durationMs": { "type": "integer", "minimum": 0 },
           "attempts": { "type": "integer", "minimum": 0 },
           "error": { "type": "string" },

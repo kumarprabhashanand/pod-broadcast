@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode"
 )
 
 const maxTableBody = 60
@@ -120,8 +121,16 @@ func duration(ms int64) string {
 	return fmt.Sprintf("%.1fs", d.Seconds())
 }
 
+// oneLine shortens a response body for the table. Control characters become "?", so a pod can't
+// send escape sequences to the user's terminal.
 func oneLine(s string, limit int) string {
 	s = strings.Join(strings.Fields(s), " ")
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return '?'
+		}
+		return r
+	}, s)
 	if r := []rune(s); len(r) > limit {
 		return string(r[:limit]) + "..."
 	}

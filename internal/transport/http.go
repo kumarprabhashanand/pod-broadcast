@@ -25,9 +25,11 @@ type Direct struct {
 }
 
 // NewDirect returns a transport that, like the API server's pod proxy, doesn't verify pod
-// certificates: they rarely name the pod's IP.
+// certificates: they rarely name the pod's IP. It ignores HTTP_PROXY and similar variables, so
+// calls and their headers never go through a proxy meant for traffic leaving the cluster.
 func NewDirect() *Direct {
 	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.Proxy = nil
 	t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	return &Direct{client: noRedirects(http.Client{Transport: t})}
 }

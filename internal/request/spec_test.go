@@ -94,6 +94,11 @@ func TestDisplayRedacts(t *testing.T) {
 		{Header{Name: "Cookie", Value: "v"}, redacted},
 		{Header{Name: "X-Auth-Token", Value: "v"}, redacted},
 		{Header{Name: "X-Api-Key", Value: "v"}, redacted},
+		{Header{Name: "X-Auth-Key", Value: "v"}, redacted},
+		{Header{Name: "Proxy-Authorization", Value: "v"}, redacted},
+		{Header{Name: "X-Session-Id", Value: "v"}, redacted},
+		{Header{Name: "X-Client-Credential", Value: "v"}, redacted},
+		{Header{Name: "X-Trace", Value: "v"}, "v"},
 	}
 	for _, tt := range tests {
 		if got := tt.h.Display(); got != tt.want {

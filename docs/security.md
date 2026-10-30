@@ -8,13 +8,14 @@ What the plugin and the controller can access, and how to limit it. To report a 
 - The API server removes the `Authorization` header from proxied requests, so the plugin refuses it. Pass credentials in another header, ideally with `--header-from-env` or `--headers-from-secret`.
 - Certificates of pods called over HTTPS aren't verified, the same as for any request through the API server's pod proxy.
 - Values of headers from the environment or a Secret, and of headers with sensitive names, are shown as `<redacted>` in every output format, including `--dry-run`.
+- Control characters in response bodies are shown as `?` in the table, so a pod can't send escape sequences to your terminal.
 
 ## Controller
 
 **Who can make it call what.** Anyone who can create a Broadcast in a namespace makes the controller call that namespace's pods, from the controller's pods. They don't need access to the pods themselves. So:
 
 - Grant `create` on `broadcasts` only to people and pipelines trusted to call the applications in the namespace.
-- The cluster-wide install rejects broadcasts in namespaces without a BroadcastPolicy. Write policies with the narrowest targets, ports, methods and paths that work.
+- The cluster-wide install rejects broadcasts in namespaces without a BroadcastPolicy. Write policies with the narrowest targets, ports, methods and paths that work. Paths that a server could read as another path, such as ones with `..` segments or percent-encoded slashes, are rejected wherever policies apply, so a path pattern can't be bypassed that way.
 - The single-namespace install allows any broadcast when there is no policy; there, the namespace's RBAC is the only control.
 
 **Secrets.** The controller reads Secrets one at a time by name, only those a Broadcast names in `headersFromSecrets`, and never lists or watches them. It uses a Secret only when it carries the label `broadcast.prabhash.net/use=true` and, where policies apply, is listed in one. Header values from Secrets aren't written to the Broadcast or its Events.
@@ -26,7 +27,7 @@ What the plugin and the controller can access, and how to limit it. To report a 
 
 **Network.**
 
-- The controller calls pod IPs directly, never other hosts, and doesn't follow redirects. Certificates of pods called over HTTPS aren't verified: pod certificates rarely name the pod's IP, and the API server's pod proxy doesn't verify them either.
+- The controller calls pod IPs directly, never other hosts, doesn't follow redirects, and ignores `HTTP_PROXY` and similar variables. Certificates of pods called over HTTPS aren't verified: pod certificates rarely name the pod's IP, and the API server's pod proxy doesn't verify them either.
 - If a pod is deleted and its IP goes to another pod between resolving the target and calling it, the request can reach the other pod. NetworkPolicies that admit the controller only to the pods it should call prevent this. Direct mode addresses pods by name through the API server.
 - Metrics are served over plain HTTP on port 8080, without authentication. They hold only counts of broadcasts and calls. A NetworkPolicy can limit who reaches them.
 

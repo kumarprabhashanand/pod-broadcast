@@ -31,7 +31,7 @@ The `ERROR` column, or `error` in JSON, says why:
 
 | Error | Meaning and fix |
 |---|---|
-| `HTTP 404` | The pod answered, but not at this path. For presets, check the actuator base path (`--base-path` or the pod annotation) and that the endpoint is exposed. |
+| `HTTP 404` | The pod answered, but not at this path. For presets, check the actuator base path (`--base-path`) and that the endpoint is exposed. |
 | `HTTP 401`, `HTTP 403` | The application refused the request. Pass the credentials it expects in a header. |
 | `HTTP 500` and other codes | The application's own answer; the `BODY` column, or `body` in JSON, often says more. Use `--success-codes` if this code is expected. |
 | `dial tcp 10.244.0.9:8081: connect: connection refused` | Nothing listens on that port. Check `--port` and the container's ports. |
@@ -51,7 +51,7 @@ The CRDs and the controller aren't installed; see [Controller](controller.md#ins
 Check `kubectl get pods -n pod-broadcast-system`, or the namespace of a single-namespace install, and the controller's logs.
 
 **`broadcast NAME rejected: ...`**
-A BroadcastPolicy doesn't allow it, and nothing was called. The message names what didn't match: no policy in the namespace, the method and path, the revert, a limit, or a Secret that isn't listed or lacks the label `broadcast.prabhash.net/use=true`.
+A BroadcastPolicy doesn't allow it, and nothing was called. The message names what didn't match: no policy in the namespace, the method and path, the revert, a limit, or a Secret that isn't listed or lacks the label `broadcast.prabhash.net/use=true`. A path with a `..` segment, `;` or percent-encoded characters is rejected where policies apply; see [BroadcastPolicy](controller.md#broadcastpolicy).
 
 **`port 8080 isn't allowed by a BroadcastPolicy`** (in a pod's row)
 The policy names the port differently on this pod. Use the port the policy allows, by name or by the number it stands for on the pod.

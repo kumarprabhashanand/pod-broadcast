@@ -39,7 +39,7 @@ All targets are in one namespace: the one from `-n`, or your kubeconfig context'
 | `--headers-from-secret` | | A Secret whose keys become headers; repeatable. Values are never shown. Needs `get` on `secrets`. |
 | `-d`, `--data` | | Request body, `@FILE` to read a file, or `@-` to read standard input |
 
-Values of headers from the environment or a Secret are shown as `<redacted>`, as are headers named `Authorization`, `Cookie` or containing `token`, `secret`, `password` or `api-key`.
+Values of headers from the environment or a Secret are shown as `<redacted>`, as are headers named `Authorization`, `Proxy-Authorization` or `Cookie`, and headers whose names contain `auth`, `token`, `secret`, `password`, `key`, `session` or `credential`.
 
 In direct mode the `Authorization` header is refused, because the API server removes it before passing the request to the pod.
 

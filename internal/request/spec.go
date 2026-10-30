@@ -41,7 +41,7 @@ func sensitive(name string) bool {
 	case "authorization", "proxy-authorization", "cookie":
 		return true
 	}
-	for _, s := range []string{"token", "secret", "password", "api-key", "apikey"} {
+	for _, s := range []string{"auth", "token", "secret", "password", "key", "session", "credential"} {
 		if strings.Contains(n, s) {
 			return true
 		}
