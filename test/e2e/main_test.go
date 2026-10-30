@@ -18,6 +18,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -319,7 +320,8 @@ func wantRequests(t *testing.T, ns string, want map[string]int) {
 	}
 }
 
-// grantRole creates a ServiceAccount with the rules, and returns the --as flag value for it.
+// grantRole creates a ServiceAccount with the rules, waits until they apply, and returns the --as
+// flag value for it.
 func grantRole(t *testing.T, ns, name string, rules ...rbacv1.PolicyRule) string {
 	t.Helper()
 	c := ctx(t)
@@ -333,7 +335,18 @@ func grantRole(t *testing.T, ns, name string, rules ...rbacv1.PolicyRule) string
 		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: name, Namespace: ns}},
 	}, metav1.CreateOptions{})
 	must(t, err)
-	return "system:serviceaccount:" + ns + ":" + name
+	user := "system:serviceaccount:" + ns + ":" + name
+	// The authorizer sees new RBAC objects a moment later; once the first rule applies, all do.
+	first := rules[0]
+	eventually(t, 30*time.Second, "the role to apply", func() bool {
+		review, err := client.AuthorizationV1().SubjectAccessReviews().Create(c, &authorizationv1.SubjectAccessReview{
+			Spec: authorizationv1.SubjectAccessReviewSpec{User: user, ResourceAttributes: &authorizationv1.ResourceAttributes{
+				Namespace: ns, Group: first.APIGroups[0], Resource: first.Resources[0], Verb: first.Verbs[0],
+			}},
+		}, metav1.CreateOptions{})
+		return err == nil && review.Status.Allowed
+	})
+	return user
 }
 
 // readRules are what a direct-mode user needs besides pods/proxy.
