@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -333,5 +335,53 @@ func TestNamespacedInstall(t *testing.T) {
 	time.Sleep(5 * time.Second)
 	if b := getBroadcast(t, other, "elsewhere"); b.Status.Phase != v1alpha1.Pending {
 		t.Errorf("a broadcast in another namespace got phase %q; the namespaced controller should ignore it", b.Status.Phase)
+	}
+}
+
+// TestDefaultUserRolesCoverBroadcasts checks deploy/user-roles.yaml: Kubernetes' view, edit and
+// admin roles gain the documented Broadcast permissions, and edit is enough to run one.
+func TestDefaultUserRolesCoverBroadcasts(t *testing.T) {
+	t.Parallel()
+	ns := threeEchoPods(t)
+	allowAll(t, ns)
+	users := map[string]string{}
+	for _, role := range []string{"view", "edit", "admin"} {
+		_, err := client.CoreV1().ServiceAccounts(ns).Create(ctx(t), &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: role}}, metav1.CreateOptions{})
+		must(t, err)
+		_, err = client.RbacV1().RoleBindings(ns).Create(ctx(t), &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: role},
+			RoleRef:    rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "ClusterRole", Name: role},
+			Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: role, Namespace: ns}},
+		}, metav1.CreateOptions{})
+		must(t, err)
+		users[role] = "system:serviceaccount:" + ns + ":" + role
+	}
+	checks := []struct {
+		user, verb, resource string
+		allowed              bool
+	}{
+		{"view", "list", "broadcasts", true},
+		{"view", "create", "broadcasts", false},
+		{"edit", "create", "broadcasts", true},
+		{"edit", "patch", "broadcasts", true},
+		{"edit", "list", "broadcastpolicies", true},
+		{"edit", "create", "broadcastpolicies", false},
+		{"admin", "create", "broadcastpolicies", true},
+	}
+	eventually(t, time.Minute, "the aggregated roles to apply", func() bool {
+		for _, c := range checks {
+			review, err := client.AuthorizationV1().SubjectAccessReviews().Create(ctx(t), &authorizationv1.SubjectAccessReview{
+				Spec: authorizationv1.SubjectAccessReviewSpec{User: users[c.user], ResourceAttributes: &authorizationv1.ResourceAttributes{
+					Namespace: ns, Group: v1alpha1.GroupName, Resource: c.resource, Verb: c.verb,
+				}},
+			}, metav1.CreateOptions{})
+			if err != nil || review.Status.Allowed != c.allowed {
+				return false
+			}
+		}
+		return true
+	})
+	if r := broadcast(t, ns, controller(append(clearCaches, "--as", users["edit"])...)...); r.code != 0 {
+		t.Errorf("a broadcast as a user with the edit role: want exit 0\n%s", r)
 	}
 }

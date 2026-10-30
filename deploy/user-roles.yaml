@@ -1,0 +1,38 @@
+# ClusterRoles that add Broadcast permissions to Kubernetes' default user roles, once per cluster:
+# view can read Broadcasts and BroadcastPolicies, edit can also run and stop Broadcasts, and admin
+# can also write BroadcastPolicies. Bind view, edit or admin per namespace as usual.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-broadcast-view
+  labels:
+    app.kubernetes.io/part-of: pod-broadcast
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+  - apiGroups: [broadcast.prabhash.net]
+    resources: [broadcasts, broadcastpolicies]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-broadcast-edit
+  labels:
+    app.kubernetes.io/part-of: pod-broadcast
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+  - apiGroups: [broadcast.prabhash.net]
+    resources: [broadcasts]
+    verbs: [create, patch, delete, deletecollection]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-broadcast-admin
+  labels:
+    app.kubernetes.io/part-of: pod-broadcast
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+  - apiGroups: [broadcast.prabhash.net]
+    resources: [broadcastpolicies]
+    verbs: [create, update, patch, delete, deletecollection]

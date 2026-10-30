@@ -35,7 +35,7 @@ fi
 kind load docker-image --name "$CLUSTER" "${IMAGES[@]}"
 
 KUBECTL=(kubectl --context "kind-$CLUSTER")
-"${KUBECTL[@]}" apply -f deploy/crds/ -f deploy/controller.yaml
+"${KUBECTL[@]}" apply -f deploy/crds/ -f deploy/controller.yaml -f deploy/user-roles.yaml
 "${KUBECTL[@]}" -n pod-broadcast-system rollout restart deploy/pod-broadcast-controller
 "${KUBECTL[@]}" -n pod-broadcast-system rollout status deploy/pod-broadcast-controller --timeout 120s
 
