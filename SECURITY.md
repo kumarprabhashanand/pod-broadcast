@@ -10,7 +10,7 @@ The discussion stays in the private advisory. Once a fix is released, the adviso
 
 ## Supported versions
 
-The project isn't released yet, so fixes go to `main`. After the first release, the latest release gets security fixes.
+The latest release gets security fixes.
 
 ## Security model
 

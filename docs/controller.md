@@ -10,14 +10,11 @@ Every Broadcast is a Kubernetes object, so creating one is subject to RBAC and t
 
 ## Install
 
-The project isn't released yet, so build the image and make it available to your cluster first. For a kind cluster:
+Each [release](https://github.com/kumarprabhashanand/pod-broadcast/releases) has the manifests with the matching image, `ghcr.io/kumarprabhashanand/pod-broadcast-controller:VERSION`, already set. The commands below use the files in this repository, which reference `pod-broadcast-controller:dev`: build that image and load it into your cluster (`kind load docker-image pod-broadcast-controller:dev` for kind), or apply the release's `controller.yaml` and `controller-namespaced.yaml` instead, together with the two `broadcast.*.yaml` CRD files.
 
 ```sh
 docker build -t pod-broadcast-controller:dev .
-kind load docker-image pod-broadcast-controller:dev
 ```
-
-For other clusters, push the image to a registry the cluster can pull from, and set it as the `image` in the manifest.
 
 **For all namespaces**, in `pod-broadcast-system`. Broadcasts in a namespace without a BroadcastPolicy are rejected.
 

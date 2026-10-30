@@ -16,9 +16,13 @@ Requests go through the Kubernetes API server's pod proxy with your own credenti
 - changes that also reach pods started later, and are reverted at the end;
 - per-namespace policies on what may be called.
 
-**Status:** in development, not released yet. Tested on Kubernetes 1.35, 1.36 and 1.37.
+**Status:** pre-1.0; the API may still change. Tested on Kubernetes 1.35, 1.36 and 1.37. See the [changelog](CHANGELOG.md).
 
-## Install from source
+## Install
+
+Download the archive for your platform from the [latest release](https://github.com/kumarprabhashanand/pod-broadcast/releases/latest), check it against `checksums.txt`, and put `kubectl-broadcast` on your `PATH`; kubectl then runs it as `kubectl broadcast`.
+
+### From source
 
 Requires Go 1.26 or newer.
 

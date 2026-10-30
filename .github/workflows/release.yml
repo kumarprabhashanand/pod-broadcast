@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.ref_name }}
+      IMAGE: ghcr.io/${{ github.repository }}-controller
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+      - name: Build the plugin
+        run: |
+          mkdir dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os=${target%/*} arch=${target#*/}
+            ext=""; [ "$os" = windows ] && ext=".exe"
+            dir=$(mktemp -d)
+            GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -trimpath \
+              -ldflags "-s -X github.com/kumarprabhashanand/pod-broadcast/internal/version.version=$VERSION" \
+              -o "$dir/kubectl-broadcast$ext" ./cmd/kubectl-broadcast
+            cp LICENSE "$dir/"
+            if [ "$os" = windows ]; then
+              (cd "$dir" && zip -q "$GITHUB_WORKSPACE/dist/kubectl-broadcast_${VERSION}_${os}_${arch}.zip" ./*)
+            else
+              tar -C "$dir" -czf "dist/kubectl-broadcast_${VERSION}_${os}_${arch}.tar.gz" .
+            fi
+          done
+      - name: Publish the controller image
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build -t "$IMAGE:$VERSION" .
+          docker push "$IMAGE:$VERSION"
+      - name: Prepare the manifests
+        run: |
+          for f in controller controller-namespaced; do
+            sed "s#image: pod-broadcast-controller:dev#image: $IMAGE:$VERSION#" "deploy/$f.yaml" > "dist/$f.yaml"
+          done
+          cp deploy/crds/*.yaml dist/
+          (cd dist && sha256sum * > checksums.txt)
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$VERSION" dist/* --title "$VERSION" --generate-notes --verify-tag
