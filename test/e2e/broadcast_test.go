@@ -303,8 +303,8 @@ func TestHTTPSAndAnnotations(t *testing.T) {
 	t.Parallel()
 	ns := newNamespace(t)
 	tls := map[string]string{
-		"broadcast.kumarprabhashanand.github.io/port":   "https",
-		"broadcast.kumarprabhashanand.github.io/scheme": "https",
+		"broadcast.prabhash.net/port":   "https",
+		"broadcast.prabhash.net/scheme": "https",
 	}
 	createPods(t, ns, echoPod("tls-a", annotated(tls)), echoPod("tls-b", annotated(tls)))
 	r := broadcast(t, ns, "-l", "app=orders", "-X", "GET", "/secure", "-o", "json")

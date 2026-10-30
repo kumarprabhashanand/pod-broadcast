@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.23.0
-  name: broadcasts.broadcast.kumarprabhashanand.github.io
+  name: broadcasts.broadcast.prabhash.net
 spec:
-  group: broadcast.kumarprabhashanand.github.io
+  group: broadcast.prabhash.net
   names:
     kind: Broadcast
     listKind: BroadcastList
@@ -121,7 +121,7 @@ spec:
                   headersFromSecrets:
                     description: |-
                       HeadersFromSecrets names Secrets whose keys become headers. Each must carry the label
-                      broadcast.kumarprabhashanand.github.io/use=true and be listed in a BroadcastPolicy.
+                      broadcast.prabhash.net/use=true and be listed in a BroadcastPolicy.
                     items:
                       type: string
                     type: array

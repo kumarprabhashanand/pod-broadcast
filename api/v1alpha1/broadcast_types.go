@@ -65,7 +65,7 @@ type Request struct {
 	Path    string            `json:"path"`
 	Headers map[string]string `json:"headers,omitempty"`
 	// HeadersFromSecrets names Secrets whose keys become headers. Each must carry the label
-	// broadcast.kumarprabhashanand.github.io/use=true and be listed in a BroadcastPolicy.
+	// broadcast.prabhash.net/use=true and be listed in a BroadcastPolicy.
 	HeadersFromSecrets []string `json:"headersFromSecrets,omitempty"`
 	// +kubebuilder:validation:MaxLength=65536
 	Body string `json:"body,omitempty"`

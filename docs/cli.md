@@ -48,7 +48,7 @@ In direct mode the `Authorization` header is refused, because the API server rem
 The port is chosen for each pod; the first rule that applies wins:
 
 1. `--port NAME|NUMBER`
-2. The pod annotation `broadcast.kumarprabhashanand.github.io/port`, a port name or number
+2. The pod annotation `broadcast.prabhash.net/port`, a port name or number
 3. For presets, the container port named `management` (`request.defaultPort` in a Broadcast)
 4. For Service targets, the Service's only port, translated to its target port
 
@@ -57,7 +57,7 @@ A port name is looked up among the pod's TCP container ports, including sidecar 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--port` | see above | Container port name or number |
-| `--scheme` | the pod annotation `broadcast.kumarprabhashanand.github.io/scheme`, then `http` | `http` or `https`. Pod certificates aren't verified, in either mode. |
+| `--scheme` | the pod annotation `broadcast.prabhash.net/scheme`, then `http` | `http` or `https`. Pod certificates aren't verified, in either mode. |
 
 Annotations go in the pod template, for example:
 
@@ -65,7 +65,7 @@ Annotations go in the pod template, for example:
 template:
   metadata:
     annotations:
-      broadcast.kumarprabhashanand.github.io/port: management
+      broadcast.prabhash.net/port: management
 ```
 
 ## Execution

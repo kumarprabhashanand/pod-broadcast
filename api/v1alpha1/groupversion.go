@@ -1,6 +1,6 @@
 // Package v1alpha1 contains the Broadcast and BroadcastPolicy API.
 // +kubebuilder:object:generate=true
-// +groupName=broadcast.kumarprabhashanand.github.io
+// +groupName=broadcast.prabhash.net
 package v1alpha1
 
 import (
@@ -10,7 +10,7 @@ import (
 )
 
 // GroupName is also the prefix of every annotation, label and finalizer the project uses.
-const GroupName = "broadcast.kumarprabhashanand.github.io"
+const GroupName = "broadcast.prabhash.net"
 
 // StopAnnotation on a Continuous broadcast ends it early: the controller reverts it and keeps the
 // object, so its result stays readable.

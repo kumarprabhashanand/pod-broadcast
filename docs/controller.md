@@ -37,7 +37,7 @@ kubectl apply -n shop -f deploy/controller-namespaced.yaml
 ## Broadcast
 
 ```yaml
-apiVersion: broadcast.kumarprabhashanand.github.io/v1alpha1
+apiVersion: broadcast.prabhash.net/v1alpha1
 kind: Broadcast
 metadata:
   generateName: clear-orders-cache-
@@ -86,7 +86,7 @@ Requests may reach a pod more than once: after a controller restart, pods withou
 ## BroadcastPolicy
 
 ```yaml
-apiVersion: broadcast.kumarprabhashanand.github.io/v1alpha1
+apiVersion: broadcast.prabhash.net/v1alpha1
 kind: BroadcastPolicy
 metadata: {name: actuator, namespace: shop}
 spec:
@@ -103,7 +103,7 @@ spec:
 - `targets` are written like CLI targets; `"*"` matches any target, and is the only way to allow label selectors.
 - `ports` are compared by number on each pod, so a number can't be used to get around a rule written with a name.
 - `paths` are RE2 patterns that must match the whole path and query.
-- Secrets used in `headersFromSecrets` must be listed in `secrets` and carry the label `broadcast.kumarprabhashanand.github.io/use=true`.
+- Secrets used in `headersFromSecrets` must be listed in `secrets` and carry the label `broadcast.prabhash.net/use=true`.
 - All policies in the namespace count; for `limits`, the strictest value wins.
 
 ## Permissions

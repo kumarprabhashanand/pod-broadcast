@@ -15,13 +15,13 @@ kind: ClusterRole
 metadata:
   name: pod-broadcast-controller
 rules:
-  - apiGroups: [broadcast.kumarprabhashanand.github.io]
+  - apiGroups: [broadcast.prabhash.net]
     resources: [broadcasts]
     verbs: [get, list, watch, patch, delete]
-  - apiGroups: [broadcast.kumarprabhashanand.github.io]
+  - apiGroups: [broadcast.prabhash.net]
     resources: [broadcasts/status]
     verbs: [update]
-  - apiGroups: [broadcast.kumarprabhashanand.github.io]
+  - apiGroups: [broadcast.prabhash.net]
     resources: [broadcastpolicies]
     verbs: [list, watch]
   - apiGroups: [""]

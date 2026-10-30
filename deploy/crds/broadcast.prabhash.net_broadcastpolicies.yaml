@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.23.0
-  name: broadcastpolicies.broadcast.kumarprabhashanand.github.io
+  name: broadcastpolicies.broadcast.prabhash.net
 spec:
-  group: broadcast.kumarprabhashanand.github.io
+  group: broadcast.prabhash.net
   names:
     kind: BroadcastPolicy
     listKind: BroadcastPolicyList

@@ -10,7 +10,7 @@ The target exists but none of its pods is ready. Check `kubectl get pods`; to ca
 **`service "orders" not found in namespace "shop"`**
 Check the name and the namespace. Targets are always in one namespace.
 
-**`can't choose a port: use --port NAME|NUMBER, or annotate the pods with broadcast.kumarprabhashanand.github.io/port`**
+**`can't choose a port: use --port NAME|NUMBER, or annotate the pods with broadcast.prabhash.net/port`**
 Nothing tells the plugin which port to call. Pass `--port`, or set the annotation in the pod template once. For a Service with several ports, the message lists their target ports.
 
 **`missing permission: POST requests need the "create" verb on pods/proxy in namespace "shop"`**
@@ -51,7 +51,7 @@ The CRDs and the controller aren't installed; see [Controller](controller.md#ins
 Check `kubectl get pods -n pod-broadcast-system`, or the namespace of a single-namespace install, and the controller's logs.
 
 **`broadcast NAME rejected: ...`**
-A BroadcastPolicy doesn't allow it, and nothing was called. The message names what didn't match: no policy in the namespace, the method and path, the revert, a limit, or a Secret that isn't listed or lacks the label `broadcast.kumarprabhashanand.github.io/use=true`.
+A BroadcastPolicy doesn't allow it, and nothing was called. The message names what didn't match: no policy in the namespace, the method and path, the revert, a limit, or a Secret that isn't listed or lacks the label `broadcast.prabhash.net/use=true`.
 
 **`port 8080 isn't allowed by a BroadcastPolicy`** (in a pod's row)
 The policy names the port differently on this pod. Use the port the policy allows, by name or by the number it stands for on the pod.

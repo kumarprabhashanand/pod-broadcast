@@ -17,7 +17,7 @@ What the plugin and the controller can access, and how to limit it. To report a 
 - The cluster-wide install rejects broadcasts in namespaces without a BroadcastPolicy. Write policies with the narrowest targets, ports, methods and paths that work.
 - The single-namespace install allows any broadcast when there is no policy; there, the namespace's RBAC is the only control.
 
-**Secrets.** The controller reads Secrets one at a time by name, only those a Broadcast names in `headersFromSecrets`, and never lists or watches them. It uses a Secret only when it carries the label `broadcast.kumarprabhashanand.github.io/use=true` and, where policies apply, is listed in one. Header values from Secrets aren't written to the Broadcast or its Events.
+**Secrets.** The controller reads Secrets one at a time by name, only those a Broadcast names in `headersFromSecrets`, and never lists or watches them. It uses a Secret only when it carries the label `broadcast.prabhash.net/use=true` and, where policies apply, is listed in one. Header values from Secrets aren't written to the Broadcast or its Events.
 
 **What a Broadcast reveals.** Anyone who can read a Broadcast sees:
 
