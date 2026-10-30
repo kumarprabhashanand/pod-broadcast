@@ -6,8 +6,8 @@ Every change goes through unit tests, lint and an end-to-end suite that runs the
 
 | Layer | What it checks | How to run |
 |---|---|---|
-| Unit tests | Target resolution and readiness, port and scheme rules, headers and redaction, retries, backoff, timeouts and concurrency, the pod proxy transport against a fake API server, table, JSON and YAML output against the [JSON Schema](../schemas/output-v1.json), every preset's exact request, BroadcastPolicy matching, and the CLI's flags, errors and exit codes against a fake cluster. A test also fails when a flag or preset is missing from the [CLI reference](cli.md). | `make test` |
-| Static checks | golangci-lint; generated CRDs and deepcopy code are up to date; the plugin builds for Linux, macOS and Windows on amd64 and arm64 | `make lint`, `make generate` |
+| Unit tests | Target resolution and readiness, port and scheme rules, headers and redaction, retries, backoff, timeouts and concurrency, the pod proxy transport against a fake API server, table, JSON and YAML output against the [JSON Schema](../schemas/output-v1.json), every preset's exact request, BroadcastPolicy matching including paths that try to escape a pattern, the controller's phases, conditions, reverts and pod limits against a fake cluster, and the CLI's flags, errors and exit codes against a fake cluster. Tests also fail when a flag or preset is missing from the [CLI reference](cli.md), or when the two controller manifests grant different permissions. | `make test` |
+| Static checks | golangci-lint; govulncheck; generated CRDs and deepcopy code are up to date; the plugin builds for Linux, macOS and Windows on amd64 and arm64, and the controller image for linux/amd64 and linux/arm64 | `make lint`, `make generate` |
 | End-to-end | The plugin binary and the controller image against a real cluster, described below | `make e2e` |
 
 ## How the end-to-end suite checks results
@@ -58,13 +58,14 @@ Tests run the plugin as a user would and check its output and exit code. They do
 | `TestContinuousReachesNewPodsAndStops` | `--for` reaches pods added by scaling up; `stop` reverts every pod exactly once and keeps the Broadcast `Completed` |
 | `TestContinuousSurvivesRestartAndExpires` | After the controller restarts, new pods are still reached; at expiry every pod is reverted exactly once, with no duplicate calls |
 | `TestNamespacedInstall` | The single-namespace manifest runs broadcasts in its namespace without a policy, and ignores other namespaces |
+| `TestDefaultUserRolesCoverBroadcasts` | With `deploy/user-roles.yaml`, Kubernetes' `view`, `edit` and `admin` roles get the documented permissions, and `edit` is enough to run a broadcast |
 
 ## Where it has run
 
 | Environment | Kubernetes | When | Result |
 |---|---|---|---|
 | kind on GitHub Actions | 1.35, 1.36, 1.37, and 1.37 dual-stack | Every pull request and every push to `main` | All tests pass |
-| kind on a laptop (Docker Desktop) | 1.37 | Manually, 2026-10-29 | All tests pass |
+| kind with Docker Desktop | 1.37 | Manually, 2026-10-29 | All tests pass |
 | Amazon EKS | 1.37 | Manually, 2026-10-30 | All tests pass; 100 pods in 1.6 seconds |
 
 ## Not covered yet
@@ -75,7 +76,7 @@ Tests run the plugin as a user would and check its output and exit code. They do
 - A revert that fails, and the resulting exit code
 - A `Continuous` broadcast with a Service target
 - StatefulSet and DaemonSet targets end to end (they share the Deployment code path, which is covered)
-- The 1,000-pod limit, failover between two controller replicas, and service meshes with strict mTLS
+- The 1,000-pod limits end to end (covered by unit tests), failover between two controller replicas, and service meshes with strict mTLS
 
 ## Running the end-to-end suite
 

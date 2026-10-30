@@ -10,25 +10,35 @@ Every Broadcast is a Kubernetes object, so creating one is subject to RBAC and t
 
 ## Install
 
-Each [release](https://github.com/kumarprabhashanand/pod-broadcast/releases) has the manifests with the matching image, `ghcr.io/kumarprabhashanand/pod-broadcast-controller:VERSION`, already set. The commands below use the files in this repository, which reference `pod-broadcast-controller:dev`: build that image and load it into your cluster (`kind load docker-image pod-broadcast-controller:dev` for kind), or apply the release's `controller.yaml` and `controller-namespaced.yaml` instead, together with the two `broadcast.*.yaml` CRD files.
+Install from a [release](https://github.com/kumarprabhashanand/pod-broadcast/releases). Its manifests run the image `ghcr.io/kumarprabhashanand/pod-broadcast-controller` for linux/amd64 and linux/arm64, pinned by digest.
 
 ```sh
-docker build -t pod-broadcast-controller:dev .
+VERSION=v0.1.0
+URL=https://github.com/kumarprabhashanand/pod-broadcast/releases/download/$VERSION
 ```
 
-**For all namespaces**, in `pod-broadcast-system`. Broadcasts in a namespace without a BroadcastPolicy are rejected.
+**CRDs and user roles**, once per cluster, by a cluster admin. `user-roles.yaml` adds Broadcast permissions to Kubernetes' default roles: `view` reads Broadcasts and BroadcastPolicies, `edit` also runs and stops Broadcasts, and `admin` also writes BroadcastPolicies.
 
 ```sh
-kubectl apply -f deploy/crds/
-kubectl apply -f deploy/controller.yaml
+kubectl apply -f $URL/broadcast.prabhash.net_broadcasts.yaml -f $URL/broadcast.prabhash.net_broadcastpolicies.yaml
+kubectl apply -f $URL/user-roles.yaml
 ```
 
-**For one namespace**, with permissions in that namespace only. Without a BroadcastPolicy, broadcasts are allowed, since the namespace's RBAC already decides who may create them. The CRDs are installed once per cluster, by a cluster admin.
+**Then the controller, for all namespaces**, in `pod-broadcast-system`. Broadcasts in a namespace without a BroadcastPolicy are rejected.
 
 ```sh
-kubectl apply -f deploy/crds/
-kubectl apply -n shop -f deploy/controller-namespaced.yaml
+kubectl apply -f $URL/controller.yaml
 ```
+
+**Or for one namespace**, with permissions in that namespace only. Without a BroadcastPolicy, broadcasts are allowed, since the namespace's RBAC already decides who may create them.
+
+```sh
+kubectl apply -n shop -f $URL/controller-namespaced.yaml
+```
+
+**From a clone of this repository**, the same files are in `deploy/`, and they run `pod-broadcast-controller:dev`. Build it with `docker build -t pod-broadcast-controller:dev .` and load it into your cluster, for example with `kind load docker-image pod-broadcast-controller:dev`.
+
+The release image is signed with a build attestation: `gh attestation verify oci://ghcr.io/kumarprabhashanand/pod-broadcast-controller:$VERSION --repo kumarprabhashanand/pod-broadcast`.
 
 **Memory** grows with the cluster: the controller keeps the Pods, EndpointSlices, Services and workloads it can see in memory. In a large cluster, prefer the single-namespace install, or add a memory limit to the manifest after watching its usage.
 
@@ -63,7 +73,7 @@ Use `kubectl create`, not `kubectl apply`: each run is a new object. `kubectl ex
 | `execution` | `concurrency`, `timeout`, `retries`, `backoff` and `successCodes`, with the CLI's defaults |
 | `ttlSecondsAfterFinished` | How long a finished Broadcast is kept; `0` deletes it at once. Defaults to the controller's `--default-ttl`, 1h. |
 
-The spec can't be changed after creation. The controller calls at most 1,000 pods per Broadcast, and keeps the first 256 bytes of each response in the status.
+The spec can't be changed after creation. The controller calls at most 1,000 pods per Broadcast, and keeps the first 256 bytes of each response in the status. `kubectl get bc` is short for `kubectl get broadcasts`, and `kubectl get bcp` for BroadcastPolicies.
 
 | Phase | Meaning |
 |---|---|
@@ -73,6 +83,8 @@ The spec can't be changed after creation. The controller calls at most 1,000 pod
 | `Active` | `Continuous`: applied to the ready pods, and applying to each pod that becomes ready |
 | `Reverting`, `Completed` | `Continuous`: sending the revert, and finished |
 
+The `Complete` condition is `True` once the Broadcast has finished, with the phase as its reason, so `kubectl wait --for=condition=Complete broadcast/NAME` waits for any result. To also fail on failed pods, use `kubectl broadcast wait NAME`, which returns the [exit codes](cli.md#exit-codes).
+
 ### Continuous mode
 
 A `Continuous` broadcast applies its request to every ready pod, then to each pod that becomes ready, until its `duration` ends. The duration defaults to the policy's `defaultDuration`, else 1h, and can't exceed the policy's `maxDuration`, else the controller's `--max-duration`, 24h.
@@ -80,6 +92,8 @@ A `Continuous` broadcast applies its request to every ready pod, then to each po
 At the end, the `revert` request goes to every pod the request reached that still exists. `kubectl broadcast stop NAME` ends it early and keeps the object; deleting it also reverts. A policy change that no longer allows the broadcast ends it too, and so does deleting its target.
 
 A pod runs with the old setting from the moment it becomes ready until the controller reaches it.
+
+A Continuous broadcast keeps track of at most 1,000 pods over its life. When a workload replaces its pods, the entries of pods that no longer exist are removed and counted as gone (`status.droppedPods`); if more than 1,000 pods that still exist were reached, the broadcast ends and reverts.
 
 Requests may reach a pod more than once: after a controller restart, pods without a recorded result are called again. Operations should be safe to repeat.
 
@@ -102,19 +116,19 @@ spec:
 - A broadcast passes when its request, and its revert, each match one rule on target, port, method and path together.
 - `targets` are written like CLI targets; `"*"` matches any target, and is the only way to allow label selectors.
 - `ports` are compared by number on each pod, so a number can't be used to get around a rule written with a name.
-- `paths` are RE2 patterns that must match the whole path and query.
+- `paths` are RE2 patterns that must match the whole path and query. So that no server reads a path as another one than the pattern matched, broadcasts are rejected when their path has `.` or `..` segments, `;`, a backslash, or percent-encoded `.`, `/`, backslash or `%`: `/actuator/caches/../shutdown` would match `/actuator/caches(/.*)?`, and many servers resolve it to `/actuator/shutdown`.
 - Secrets used in `headersFromSecrets` must be listed in `secrets` and carry the label `broadcast.prabhash.net/use=true`.
 - All policies in the namespace count; for `limits`, the strictest value wins.
 
 ## Permissions
 
-People and pipelines that create broadcasts need `create`, `get`, `list` and `watch` on `broadcasts`, and `patch` for `kubectl broadcast stop`. They don't need access to the target's pods or to the Secrets a policy lists, so policies should be written by namespace admins.
+People and pipelines that create broadcasts need `create`, `get`, `list` and `watch` on `broadcasts`, and `patch` for `kubectl broadcast stop`; with `user-roles.yaml` installed, the `edit` role has them. They don't need access to the target's pods or to the Secrets a policy lists, so policies should be written by namespace admins, which the `admin` role allows.
 
 The controller's own permissions are in the manifests. It reads Secrets one at a time by name, and never lists or watches them.
 
 ## Networking
 
-The controller calls pod IPs directly, never other hosts, and doesn't follow redirects. If NetworkPolicies restrict traffic into your pods, allow the controller's pods (label `app: pod-broadcast-controller`, in the controller's namespace) on the target ports.
+The controller calls pod IPs directly, never other hosts, and doesn't follow redirects. It ignores `HTTP_PROXY` and similar variables, so pod calls never go through a proxy. If NetworkPolicies restrict traffic into your pods, allow the controller's pods (label `app: pod-broadcast-controller`, in the controller's namespace) on the target ports.
 
 ## Events and metrics
 
@@ -137,3 +151,4 @@ The controller records an Event on the Broadcast at each phase change; `kubectl 
 | `--metrics-bind-address` | `:8080` | Prometheus metrics |
 | `--health-probe-bind-address` | `:8081` | `/healthz` and `/readyz` |
 | `--version` | | Print the version and exit; the version is also logged at startup |
+| `--zap-log-level` | `info` | Log level: `debug`, `info`, `error`, or a number for more detail. `--zap-encoder`, `--zap-devel` and the other `--zap-` flags set the log format. |

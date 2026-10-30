@@ -1,5 +1,9 @@
 # pod-broadcast
 
+[![CI](https://github.com/kumarprabhashanand/pod-broadcast/actions/workflows/ci.yml/badge.svg)](https://github.com/kumarprabhashanand/pod-broadcast/actions/workflows/ci.yml)
+[![E2E](https://github.com/kumarprabhashanand/pod-broadcast/actions/workflows/e2e.yml/badge.svg)](https://github.com/kumarprabhashanand/pod-broadcast/actions/workflows/e2e.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 `kubectl broadcast` sends one HTTP request to every ready pod of a Kubernetes Service, workload or label selector, and shows each pod's result.
 
 ```console
@@ -20,17 +24,24 @@ Requests go through the Kubernetes API server's pod proxy with your own credenti
 
 ## Install
 
-Download the archive for your platform from the [latest release](https://github.com/kumarprabhashanand/pod-broadcast/releases/latest), check it against `checksums.txt`, and put `kubectl-broadcast` on your `PATH`; kubectl then runs it as `kubectl broadcast`.
+Download the archive for your platform from the [latest release](https://github.com/kumarprabhashanand/pod-broadcast/releases/latest), unpack it, and put `kubectl-broadcast` on your `PATH`; kubectl then runs it as `kubectl broadcast`.
 
-### From source
-
-Requires Go 1.26 or newer.
+To check a download, compare it with `checksums.txt`, and verify that it was built by this repository's release workflow with the [GitHub CLI](https://cli.github.com/):
 
 ```sh
-go build -o bin/kubectl-broadcast ./cmd/kubectl-broadcast
+sha256sum --check --ignore-missing checksums.txt
+gh attestation verify kubectl-broadcast_v0.1.0_linux_amd64.tar.gz --repo kumarprabhashanand/pod-broadcast
 ```
 
-Put `bin/kubectl-broadcast` on your `PATH`; kubectl then runs it as `kubectl broadcast`.
+On macOS, a downloaded binary is quarantined until you allow it: run `xattr -d com.apple.quarantine kubectl-broadcast`, or allow it in System Settings, Privacy & Security.
+
+### With Go
+
+```sh
+go install github.com/kumarprabhashanand/pod-broadcast/cmd/kubectl-broadcast@latest
+```
+
+This needs Go 1.26 or newer; Go downloads the 1.27 toolchain the module asks for by itself.
 
 ## Quick start
 
