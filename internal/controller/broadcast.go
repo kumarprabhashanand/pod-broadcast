@@ -3,7 +3,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -104,90 +103,64 @@ func (r *BroadcastReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	case st.Phase == v1alpha1.Reverting || b.DeletionTimestamp != nil ||
 		(st.Phase == v1alpha1.Active && time.Now().After(st.ExpiresAt.Time)):
 		return r.revert(ctx, &b, "")
+	case b.Spec.Mode == v1alpha1.Once:
+		return r.runOnce(ctx, &b)
 	case st.Phase == v1alpha1.Pending:
 		return r.start(ctx, &b)
-	case st.Phase == v1alpha1.Running:
-		return r.runOnce(ctx, &b)
 	}
 	return r.apply(ctx, &b)
 }
 
-func (r *BroadcastReconciler) start(ctx context.Context, b *v1alpha1.Broadcast) (ctrl.Result, error) {
-	d, rejection, err := r.check(ctx, b)
+// runOnce calls every pod of the target once. It also resumes a broadcast that a restart left Running.
+func (r *BroadcastReconciler) runOnce(ctx context.Context, b *v1alpha1.Broadcast) (ctrl.Result, error) {
+	d, c, rejection, err := r.prepare(ctx, b)
 	if err != nil {
 		return ctrl.Result{}, err
-	}
-	if rejection == "" {
-		_, rejection, err = r.requests(ctx, b)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
 	}
 	if rejection != "" {
 		return r.finish(ctx, b, v1alpha1.Rejected, rejection)
 	}
-	if b.Spec.Mode == v1alpha1.Continuous {
-		if err := r.setFinalizer(ctx, b, true); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-	now := metav1.Now()
-	if b.Status.StartedAt == nil {
+	if b.Status.Phase == v1alpha1.Pending {
+		now := metav1.Now()
 		b.Status.StartedAt = &now
-	}
-	if b.Spec.Mode == v1alpha1.Once {
 		b.Status.Phase = v1alpha1.Running
 		if err := r.Status().Update(ctx, b); err != nil {
 			return ctrl.Result{}, err
 		}
 		r.event(b, "started")
-		return r.runOnce(ctx, b)
 	}
-	// The phase stays Pending during the first pass and becomes Active after it, so waiting for
-	// Active means waiting for the first pass.
-	if b.Status.ExpiresAt == nil {
-		b.Status.ExpiresAt = &metav1.Time{Time: now.Add(d.Duration)}
-		if err := r.Status().Update(ctx, b); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-	return r.apply(ctx, b)
-}
-
-func (r *BroadcastReconciler) runOnce(ctx context.Context, b *v1alpha1.Broadcast) (ctrl.Result, error) {
-	d, rejection, err := r.check(ctx, b)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	c, requestRejection, err := r.requests(ctx, b)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if rejection == "" {
-		rejection = requestRejection
-	}
-	if rejection != "" {
-		return r.finish(ctx, b, v1alpha1.Rejected, rejection)
-	}
-	eps, problem, err := r.endpoints(ctx, b, d)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	eps, problem := r.endpoints(ctx, b, d)
 	if problem != "" {
 		return r.finish(ctx, b, v1alpha1.Failed, problem)
 	}
 	if err := r.call(ctx, b, notCalled(eps, b.Status.Pods), c.spec, c.opts, false); err != nil {
 		return ctrl.Result{}, err
 	}
-	s := b.Status.Summary
-	phase := v1alpha1.PartiallyFailed
-	switch {
-	case s.Failed == 0 && s.Succeeded > 0:
-		phase = v1alpha1.Succeeded
-	case s.Succeeded == 0:
-		phase = v1alpha1.Failed
+	return r.finish(ctx, b, b.Status.Summary.Outcome(), "")
+}
+
+// start checks a new Continuous broadcast and makes its first pass. The phase stays Pending during
+// the first pass and becomes Active after it, so waiting for Active means waiting for the first pass.
+func (r *BroadcastReconciler) start(ctx context.Context, b *v1alpha1.Broadcast) (ctrl.Result, error) {
+	d, _, rejection, err := r.prepare(ctx, b)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
-	return r.finish(ctx, b, phase, "")
+	if rejection != "" {
+		return r.finish(ctx, b, v1alpha1.Rejected, rejection)
+	}
+	if err := r.setFinalizer(ctx, b, true); err != nil {
+		return ctrl.Result{}, err
+	}
+	if b.Status.ExpiresAt == nil {
+		now := metav1.Now()
+		b.Status.StartedAt = &now
+		b.Status.ExpiresAt = &metav1.Time{Time: now.Add(d.Duration)}
+		if err := r.Status().Update(ctx, b); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	return r.apply(ctx, b)
 }
 
 // apply calls the target's pods that the request hasn't reached yet, until the broadcast expires.
@@ -199,10 +172,8 @@ func (r *BroadcastReconciler) apply(ctx context.Context, b *v1alpha1.Broadcast) 
 	if rejection != "" {
 		return r.revert(ctx, b, "no longer allowed: "+rejection)
 	}
-	eps, problem, err := r.endpoints(ctx, b, d)
+	eps, problem := r.endpoints(ctx, b, d)
 	switch {
-	case err != nil:
-		return ctrl.Result{}, err
 	case problem != "" && len(b.Status.Pods) == 0:
 		return r.finish(ctx, b, v1alpha1.Failed, problem)
 	case problem != "":
@@ -268,10 +239,7 @@ func (r *BroadcastReconciler) revert(ctx context.Context, b *v1alpha1.Broadcast,
 			return ctrl.Result{}, err
 		}
 	}
-	if _, err := r.finish(ctx, b, v1alpha1.Completed, ""); err != nil {
-		return ctrl.Result{}, err
-	}
-	return r.done(ctx, b)
+	return r.finish(ctx, b, v1alpha1.Completed, "")
 }
 
 // done removes the finalizer of a finished broadcast and deletes it once its TTL has passed.
@@ -325,9 +293,6 @@ func (r *BroadcastReconciler) finish(ctx context.Context, b *v1alpha1.Broadcast,
 	}
 	finishedTotal.WithLabelValues(string(phase)).Inc()
 	r.event(b, message)
-	if phase == v1alpha1.Completed {
-		return ctrl.Result{}, nil
-	}
 	return r.done(ctx, b)
 }
 
@@ -354,6 +319,16 @@ func (r *BroadcastReconciler) check(ctx context.Context, b *v1alpha1.Broadcast) 
 		return d, err.Error(), nil
 	}
 	return d, "", nil
+}
+
+// prepare checks the policies and builds the requests. A rejection says why b can't run.
+func (r *BroadcastReconciler) prepare(ctx context.Context, b *v1alpha1.Broadcast) (policy.Decision, calls, string, error) {
+	d, rejection, err := r.check(ctx, b)
+	if err != nil || rejection != "" {
+		return d, calls{}, rejection, err
+	}
+	c, rejection, err := r.requests(ctx, b)
+	return d, c, rejection, err
 }
 
 // calls holds the requests of one broadcast.
@@ -402,31 +377,31 @@ func (r *BroadcastReconciler) requests(ctx context.Context, b *v1alpha1.Broadcas
 }
 
 // endpoints resolves the target. A problem means the broadcast can't go ahead; no pods is not one.
-func (r *BroadcastReconciler) endpoints(ctx context.Context, b *v1alpha1.Broadcast, d policy.Decision) ([]target.Endpoint, string, error) {
+func (r *BroadcastReconciler) endpoints(ctx context.Context, b *v1alpha1.Broadcast, d policy.Decision) ([]target.Endpoint, string) {
 	ref, err := target.FromSpec(b.Spec.Target)
 	if err != nil {
-		return nil, err.Error(), nil
+		return nil, err.Error()
 	}
 	set, err := target.Resolve(ctx, r.Client, b.Namespace, ref, target.ResolveOptions{IncludeNotReady: b.Spec.Target.IncludeNotReady})
 	switch {
 	case err != nil:
-		return nil, err.Error(), nil
+		return nil, err.Error()
 	case len(set.Pods) == 0 && b.Spec.Mode == v1alpha1.Once:
-		return nil, fmt.Sprintf("no ready pods matched %s", ref), nil
+		return nil, fmt.Sprintf("no ready pods matched %s", ref)
 	case len(set.Pods) > maxPods:
-		return nil, fmt.Sprintf("%d pods matched %s; a Broadcast calls at most %d", len(set.Pods), ref, maxPods), nil
+		return nil, fmt.Sprintf("%d pods matched %s; a Broadcast calls at most %d", len(set.Pods), ref, maxPods)
 	}
 	req := b.Spec.Request
 	eps, err := target.Endpoints(set, target.PortChoice{Port: req.Port, Scheme: req.Scheme, DefaultPort: req.DefaultPort})
-	if errors.Is(err, target.ErrNoPort) {
-		return nil, "no port: set request.port, or annotate the pods with " + target.AnnotationPort, nil
+	if err != nil {
+		return nil, "no port: set request.port, or annotate the pods with " + target.AnnotationPort
 	}
 	for i := range eps {
 		if eps[i].Err == nil && !d.AllowsPort(eps[i].Pod, eps[i].Port) {
 			eps[i].Err = fmt.Errorf("port %d isn't allowed by a BroadcastPolicy", eps[i].Port)
 		}
 	}
-	return eps, "", err
+	return eps, ""
 }
 
 // reached returns the pods the request succeeded on, marking those deleted since as Gone.

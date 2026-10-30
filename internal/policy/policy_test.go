@@ -12,14 +12,12 @@ import (
 	"github.com/kumarprabhashanand/pod-broadcast/api/v1alpha1"
 )
 
-func ptr[T any](v T) *T { return &v }
-
 func broadcast(mutate ...func(*v1alpha1.BroadcastSpec)) *v1alpha1.Broadcast {
 	b := &v1alpha1.Broadcast{Spec: v1alpha1.BroadcastSpec{
 		Target:    v1alpha1.Target{Service: "orders"},
 		Request:   v1alpha1.Request{Method: "DELETE", Path: "/actuator/caches"},
 		Mode:      v1alpha1.Once,
-		Execution: v1alpha1.Execution{Concurrency: 10, Retries: ptr[int32](2)},
+		Execution: v1alpha1.Execution{Concurrency: 10, Retries: new(int32(2))},
 	}}
 	for _, m := range mutate {
 		m(&b.Spec)
@@ -86,12 +84,12 @@ func TestCheck(t *testing.T) {
 			b: broadcast(), wantErr: "BroadcastPolicy path"},
 		{name: "concurrency over the strictest limit",
 			policies: []v1alpha1.BroadcastPolicy{
-				policy(actuator, func(p *v1alpha1.BroadcastPolicySpec) { p.Limits.MaxConcurrency = ptr[int32](20) }),
-				policy(nil, func(p *v1alpha1.BroadcastPolicySpec) { p.Limits.MaxConcurrency = ptr[int32](5) }),
+				policy(actuator, func(p *v1alpha1.BroadcastPolicySpec) { p.Limits.MaxConcurrency = new(int32(20)) }),
+				policy(nil, func(p *v1alpha1.BroadcastPolicySpec) { p.Limits.MaxConcurrency = new(int32(5)) }),
 			},
 			b: broadcast(), wantErr: "concurrency 10 is above the policy limit 5"},
 		{name: "retries over the limit",
-			policies: []v1alpha1.BroadcastPolicy{policy(actuator, func(p *v1alpha1.BroadcastPolicySpec) { p.Limits.MaxRetries = ptr[int32](1) })},
+			policies: []v1alpha1.BroadcastPolicy{policy(actuator, func(p *v1alpha1.BroadcastPolicySpec) { p.Limits.MaxRetries = new(int32(1)) })},
 			b:        broadcast(), wantErr: "retries 2 is above the policy limit 1"},
 		{name: "secret listed",
 			policies: []v1alpha1.BroadcastPolicy{policy(actuator, func(p *v1alpha1.BroadcastPolicySpec) { p.Secrets = []string{"auth"} })},

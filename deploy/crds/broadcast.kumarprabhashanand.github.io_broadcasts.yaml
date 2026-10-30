@@ -65,8 +65,7 @@ spec:
                 type: string
               execution:
                 default: {}
-                description: Execution's fields are pointers so that a zero value
-                  from a Go client still gets the default.
+                description: Execution sets how the pods are called.
                 properties:
                   backoff:
                     default: 1s

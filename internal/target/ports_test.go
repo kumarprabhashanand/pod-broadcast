@@ -8,8 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func ptr(p intstr.IntOrString) *intstr.IntOrString { return &p }
-
 func TestEndpointsPortRules(t *testing.T) {
 	management := container(port("management", 8081), port("http", 8080))
 	tests := []struct {
@@ -22,13 +20,13 @@ func TestEndpointsPortRules(t *testing.T) {
 		{
 			name:   "explicit number wins over the annotation",
 			pod:    newPod("a", management, annotated(AnnotationPort, "9000")),
-			choice: PortChoice{Port: ptr(intstr.FromInt32(8081))},
+			choice: PortChoice{Port: new(intstr.FromInt32(8081))},
 			want:   8081,
 		},
 		{
 			name:   "explicit name is resolved on the pod",
 			pod:    newPod("a", management),
-			choice: PortChoice{Port: ptr(intstr.FromString("management"))},
+			choice: PortChoice{Port: new(intstr.FromString("management"))},
 			want:   8081,
 		},
 		{name: "annotation number", pod: newPod("a", annotated(AnnotationPort, "9000")), want: 9000},
@@ -56,7 +54,7 @@ func TestEndpointsPortRules(t *testing.T) {
 				always := corev1.ContainerRestartPolicyAlways
 				p.Spec.InitContainers = []corev1.Container{{Name: "proxy", RestartPolicy: &always, Ports: []corev1.ContainerPort{port("admin", 15000)}}}
 			}),
-			choice: PortChoice{Port: ptr(intstr.FromString("admin"))},
+			choice: PortChoice{Port: new(intstr.FromString("admin"))},
 			want:   15000,
 		},
 	}
@@ -96,7 +94,7 @@ func TestEndpointsWithoutAnyRule(t *testing.T) {
 
 func TestEndpointsPodErrors(t *testing.T) {
 	management := container(port("management", 8081))
-	byName := PortChoice{Port: ptr(intstr.FromString("management"))}
+	byName := PortChoice{Port: new(intstr.FromString("management"))}
 	tests := []struct {
 		name   string
 		pod    *corev1.Pod
@@ -149,7 +147,7 @@ func TestEndpointsInvalidPortAnnotation(t *testing.T) {
 }
 
 func TestEndpointsScheme(t *testing.T) {
-	numeric := PortChoice{Port: ptr(intstr.FromInt32(8080))}
+	numeric := PortChoice{Port: new(intstr.FromInt32(8080))}
 	tests := []struct {
 		name     string
 		pod      *corev1.Pod

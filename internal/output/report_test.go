@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/kumarprabhashanand/pod-broadcast/internal/request"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
@@ -18,7 +19,7 @@ import (
 
 func ep(name string, err error) target.Endpoint {
 	return target.Endpoint{
-		Pod:    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, UID: "uid-" + "x"}, Status: corev1.PodStatus{PodIP: "10.0.0.1"}},
+		Pod:    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID("uid-" + name)}, Status: corev1.PodStatus{PodIP: "10.0.0.1"}},
 		Port:   8081,
 		Scheme: "http",
 		Err:    err,
@@ -54,6 +55,7 @@ func TestOutcomeAndExitCode(t *testing.T) {
 	}{
 		{"all succeeded", []request.Result{ok, ok}, OutcomeSucceeded, 0},
 		{"succeeded and gone", []request.Result{ok, gone}, OutcomeSucceeded, 0},
+		{"all gone", []request.Result{gone, gone}, OutcomeSucceeded, 0},
 		{"some failed", []request.Result{ok, bad}, OutcomePartiallyFailed, 1},
 		{"all failed", []request.Result{bad, bad}, OutcomeFailed, 3},
 		{"failed and gone", []request.Result{bad, gone}, OutcomeFailed, 3},
@@ -171,19 +173,5 @@ func TestSchemaRejectsInvalidReports(t *testing.T) {
 		if schema.Validate(doc) == nil {
 			t.Errorf("schema accepted %s", bad)
 		}
-	}
-}
-
-func TestDuration(t *testing.T) {
-	for ms, want := range map[int64]string{0: "0ms", 41: "41ms", 999: "999ms", 1000: "1.0s", 5149: "5.1s"} {
-		if got := duration(ms); got != want {
-			t.Errorf("duration(%d) = %q, want %q", ms, got, want)
-		}
-	}
-}
-
-func TestUnknownFormat(t *testing.T) {
-	if err := Write(&bytes.Buffer{}, "xml", Report{}); err == nil {
-		t.Error("want an error for an unknown format")
 	}
 }

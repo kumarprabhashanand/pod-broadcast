@@ -317,7 +317,6 @@ func kubeCluster(f *genericclioptions.ConfigFlags) (*cluster, error) {
 		return nil, err
 	}
 	config = rest.CopyConfig(config)
-	config.QPS, config.Burst = 50, 100
 	config.UserAgent = "kubectl-broadcast/" + version.String()
 	c, err := client.New(config, client.Options{Scheme: scheme})
 	if err != nil {

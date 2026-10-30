@@ -147,12 +147,11 @@ func TestControllerExitCodesAndWait(t *testing.T) {
 	if r := broadcast(t, ns, controller(append(clearCaches, "--backoff", "100ms")...)...); r.code != 1 {
 		t.Errorf("one failing pod: want exit 1\n%s", r)
 	}
-	port := intstr.FromString("management")
 	must(t, objects.Create(ctx(t), &v1alpha1.Broadcast{
 		ObjectMeta: metav1.ObjectMeta{Name: "from-yaml", Namespace: ns},
 		Spec: v1alpha1.BroadcastSpec{
 			Target:  v1alpha1.Target{Service: "orders"},
-			Request: v1alpha1.Request{Port: &port, Method: "DELETE", Path: "/actuator/caches"},
+			Request: v1alpha1.Request{Port: new(intstr.FromString("management")), Method: "DELETE", Path: "/actuator/caches"},
 		},
 	}))
 	if r := broadcast(t, ns, "wait", "from-yaml"); r.code != 1 || !strings.Contains(r.stdout, "2 targeted: 1 succeeded, 1 failed") {
@@ -164,13 +163,12 @@ func TestControllerDeletesAfterTTL(t *testing.T) {
 	t.Parallel()
 	ns := threeEchoPods(t)
 	allowAll(t, ns)
-	port, ttl := intstr.FromString("management"), int32(0)
 	must(t, objects.Create(ctx(t), &v1alpha1.Broadcast{
 		ObjectMeta: metav1.ObjectMeta{Name: "short-lived", Namespace: ns},
 		Spec: v1alpha1.BroadcastSpec{
 			Target:                  v1alpha1.Target{Service: "orders"},
-			Request:                 v1alpha1.Request{Port: &port, Method: "DELETE", Path: "/actuator/caches"},
-			TTLSecondsAfterFinished: &ttl,
+			Request:                 v1alpha1.Request{Port: new(intstr.FromString("management")), Method: "DELETE", Path: "/actuator/caches"},
+			TTLSecondsAfterFinished: new(int32(0)),
 		},
 	}))
 	eventually(t, time.Minute, "the broadcast to be deleted", func() bool {
@@ -262,14 +260,13 @@ func TestContinuousSurvivesRestartAndExpires(t *testing.T) {
 	ns := newNamespace(t)
 	allowAll(t, ns)
 	webDeployment(t, ns, 2)
-	port := intstr.FromString("management")
 	must(t, objects.Create(ctx(t), &v1alpha1.Broadcast{
 		ObjectMeta: metav1.ObjectMeta{Name: "debug", Namespace: ns},
 		Spec: v1alpha1.BroadcastSpec{
 			Target:   v1alpha1.Target{WorkloadRef: &v1alpha1.WorkloadRef{Kind: "Deployment", Name: "web"}},
 			Mode:     v1alpha1.Continuous,
 			Duration: &metav1.Duration{Duration: 45 * time.Second},
-			Request:  v1alpha1.Request{Port: &port, Method: "POST", Path: "/actuator/loggers/com.shop", Body: `{"configuredLevel":"DEBUG"}`},
+			Request:  v1alpha1.Request{Port: new(intstr.FromString("management")), Method: "POST", Path: "/actuator/loggers/com.shop", Body: `{"configuredLevel":"DEBUG"}`},
 			Revert:   &v1alpha1.Revert{Method: "POST", Path: "/actuator/loggers/com.shop", Body: "{}"},
 		},
 	}))
@@ -329,10 +326,9 @@ func TestNamespacedInstall(t *testing.T) {
 		t.Errorf("namespaced controller without a policy: want exit 0\n%s", r)
 	}
 	other := newNamespace(t)
-	port := intstr.FromInt32(8080)
 	must(t, objects.Create(ctx(t), &v1alpha1.Broadcast{
 		ObjectMeta: metav1.ObjectMeta{Name: "elsewhere", Namespace: other},
-		Spec:       v1alpha1.BroadcastSpec{Target: v1alpha1.Target{Service: "orders"}, Request: v1alpha1.Request{Port: &port, Method: "GET", Path: "/"}},
+		Spec:       v1alpha1.BroadcastSpec{Target: v1alpha1.Target{Service: "orders"}, Request: v1alpha1.Request{Port: new(intstr.FromInt32(8080)), Method: "GET", Path: "/"}},
 	}))
 	time.Sleep(5 * time.Second)
 	if b := getBroadcast(t, other, "elsewhere"); b.Status.Phase != v1alpha1.Pending {

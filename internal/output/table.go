@@ -103,6 +103,12 @@ func summary(s Summary) string {
 	if s.Gone > 0 {
 		parts = append(parts, fmt.Sprintf("%d gone", s.Gone))
 	}
+	if s.Reverted > 0 {
+		parts = append(parts, fmt.Sprintf("%d reverted", s.Reverted))
+	}
+	if s.RevertFailed > 0 {
+		parts = append(parts, fmt.Sprintf("%d revert failed", s.RevertFailed))
+	}
 	return fmt.Sprintf("%d targeted: %s", s.Targeted, strings.Join(parts, ", "))
 }
 

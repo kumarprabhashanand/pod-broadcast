@@ -7,6 +7,7 @@
 # KEEP_CLUSTER  set to keep the cluster afterwards; an existing cluster is reused
 # DUAL_STACK    set to create a dual-stack cluster
 # SKIP_BUILD    set when the test images are already built
+# E2E_SKIP_SCALE  set to skip the 100-pod test
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

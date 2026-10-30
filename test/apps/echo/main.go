@@ -1,5 +1,5 @@
-// Command echo is the end-to-end test server. It answers every request with a JSON description of
-// what it received and records the request, so tests can count calls per pod on the stats port.
+// Command echo is the end-to-end test server. It records every request it receives, so tests can
+// read them per pod on the stats port, and answers with the status code from STATUS.
 package main
 
 import (
@@ -31,9 +31,7 @@ type record struct {
 }
 
 type server struct {
-	pod     string
 	status  int
-	delay   time.Duration
 	ready   bool
 	mu      sync.Mutex
 	records []record
@@ -45,20 +43,13 @@ func main() {
 	stats := flag.String("stats", ":9090", "listen address for /requests and /ready")
 	flag.Parse()
 
-	s := &server{pod: os.Getenv("POD_NAME"), status: http.StatusOK, ready: os.Getenv("READY") != "false"}
+	s := &server{status: http.StatusOK, ready: os.Getenv("READY") != "false"}
 	if v := os.Getenv("STATUS"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
 			log.Fatalf("STATUS: %v", err)
 		}
 		s.status = n
-	}
-	if v := os.Getenv("DELAY"); v != "" {
-		d, err := time.ParseDuration(v)
-		if err != nil {
-			log.Fatalf("DELAY: %v", err)
-		}
-		s.delay = d
 	}
 
 	statsMux := http.NewServeMux()
@@ -107,28 +98,15 @@ func (s *server) handleEcho(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
-	rec := record{Method: r.Method, Path: r.URL.RequestURI(), Host: r.Host, Headers: r.Header, Body: string(body)}
 	s.mu.Lock()
-	s.records = append(s.records, rec)
+	s.records = append(s.records, record{Method: r.Method, Path: r.URL.RequestURI(), Host: r.Host, Headers: r.Header, Body: string(body)})
 	s.mu.Unlock()
-
-	time.Sleep(s.delay)
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(s.status)
-	_ = json.NewEncoder(w).Encode(struct {
-		Pod string `json:"pod"`
-		record
-	}{s.pod, rec})
 }
 
-func (s *server) handleRequests(w http.ResponseWriter, r *http.Request) {
+func (s *server) handleRequests(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if r.Method == http.MethodDelete {
-		s.records = nil
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(append([]record{}, s.records...))
 }

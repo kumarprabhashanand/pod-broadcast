@@ -60,12 +60,8 @@ type Request struct {
 	Body    string            `json:"body,omitempty"`
 }
 
-type Summary struct {
-	Targeted  int `json:"targeted"`
-	Succeeded int `json:"succeeded"`
-	Failed    int `json:"failed"`
-	Gone      int `json:"gone"`
-}
+// Summary counts the pods by result; it is the same in both modes.
+type Summary = v1alpha1.Summary
 
 type Pod struct {
 	Name       string `json:"name"`
@@ -134,8 +130,8 @@ func NewReport(ns string, ref target.Ref, spec request.Spec, results []request.R
 			r.Summary.Failed++
 		}
 	}
-	r.Summary.Targeted = len(results)
-	r.Outcome = outcome(r.Summary)
+	r.Summary.Targeted = int32(len(results))
+	r.Outcome = Outcome(r.Summary.Outcome())
 	return r
 }
 
@@ -155,20 +151,9 @@ func FromBroadcast(b *v1alpha1.Broadcast) Report {
 			DurationMs: p.DurationMs, Attempts: int(p.Attempts), Error: p.Error, Body: p.Body,
 		})
 	}
-	s := b.Status.Summary
-	r.Summary = Summary{Targeted: int(s.Targeted), Succeeded: int(s.Succeeded), Failed: int(s.Failed), Gone: int(s.Gone)}
-	r.Outcome = outcome(r.Summary)
+	r.Summary = b.Status.Summary
+	r.Outcome = Outcome(r.Summary.Outcome())
 	return r
-}
-
-func outcome(s Summary) Outcome {
-	switch {
-	case s.Failed == 0 && s.Succeeded > 0:
-		return OutcomeSucceeded
-	case s.Succeeded == 0:
-		return OutcomeFailed
-	}
-	return OutcomePartiallyFailed
 }
 
 // NewDryRunReport lists the pods that would be called. Pods that can't be called are Failed.
@@ -186,7 +171,7 @@ func NewDryRunReport(ns string, ref target.Ref, spec request.Spec, endpoints []t
 		}
 		r.Pods = append(r.Pods, p)
 	}
-	r.Summary.Targeted = len(endpoints)
+	r.Summary.Targeted = int32(len(endpoints))
 	return r
 }
 

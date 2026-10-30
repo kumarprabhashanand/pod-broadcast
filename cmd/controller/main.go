@@ -37,17 +37,20 @@ func main() {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	// The cache holds every pod the controller may target; managed fields are dead weight there.
+	cacheOpts := cache.Options{DefaultTransform: cache.TransformStripManagedFields()}
+	if namespace != "" {
+		cacheOpts.DefaultNamespaces = map[string]cache.Config{namespace: {}}
+	}
 	opts := ctrl.Options{
 		Scheme:                 scheme,
+		Cache:                  cacheOpts,
 		Metrics:                metricsserver.Options{BindAddress: metricsAddr},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         leaderElect,
 		LeaderElectionID:       "pod-broadcast-controller",
 		// The process exits right after the manager stops, so a standby can take over at once.
 		LeaderElectionReleaseOnCancel: true,
-	}
-	if namespace != "" {
-		opts.Cache = cache.Options{DefaultNamespaces: map[string]cache.Config{namespace: {}}}
 	}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), opts)
 	if err != nil {

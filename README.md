@@ -10,9 +10,13 @@ orders-9bf8f4bb-ptg98  Succeeded  204   16ms  1
 2 targeted: 2 succeeded
 ```
 
-Requests go through the Kubernetes API server's pod proxy with your own credentials, so nothing needs to be installed in the cluster. An optional [controller](docs/controller.md) runs broadcasts as Kubernetes objects: for CI, for changes that also reach pods started later and are reverted at the end, and with per-namespace policies.
+Requests go through the Kubernetes API server's pod proxy with your own credentials, so nothing needs to be installed in the cluster. An optional [controller](docs/controller.md) runs broadcasts as Kubernetes objects, which adds:
 
-**Status:** in development, not released yet.
+- broadcasts from CI or any program, through the Kubernetes API;
+- changes that also reach pods started later, and are reverted at the end;
+- per-namespace policies on what may be called.
+
+**Status:** in development, not released yet. Tested on Kubernetes 1.35, 1.36 and 1.37.
 
 ## Install from source
 
@@ -44,13 +48,13 @@ kubectl broadcast -l app=orders spring health -o json
 kubectl broadcast svc/orders spring refresh --dry-run
 
 # With the controller: DEBUG logging for 30 minutes, also on pods that start meanwhile
-kubectl broadcast deploy/orders spring set-log-level com.shop.orders DEBUG --for 30m
-kubectl broadcast stop <name>   # end it early; the level is reset on every pod
+kubectl broadcast deploy/orders spring set-log-level com.shop.orders DEBUG --for 30m --name debug
+kubectl broadcast stop debug   # end it early; the level is reset on every pod
 ```
 
 Put kubectl flags such as `--context` and `-n` after `broadcast`.
 
-The exit code is 0 when every pod succeeded, 1 when some failed, 2 for a usage error or when no pods matched, and 3 when every pod failed, so scripts and CI can react.
+The exit code is 0 when no pod failed, 1 when some failed, 2 for a usage error or when no pods matched, and 3 when pods failed and none succeeded, so scripts and CI can react.
 
 ## Documentation
 

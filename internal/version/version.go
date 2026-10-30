@@ -1,9 +1,6 @@
 package version
 
-import (
-	"runtime"
-	"runtime/debug"
-)
+import "runtime/debug"
 
 // version is set at release time with -ldflags "-X <module>/internal/version.version=vX.Y.Z".
 var version string
@@ -16,8 +13,4 @@ func String() string {
 		return bi.Main.Version
 	}
 	return "dev"
-}
-
-func Platform() string {
-	return runtime.Version() + " " + runtime.GOOS + "/" + runtime.GOARCH
 }

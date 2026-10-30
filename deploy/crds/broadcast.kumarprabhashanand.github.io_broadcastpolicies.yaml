@@ -87,11 +87,13 @@ spec:
                     type: string
                   maxConcurrency:
                     format: int32
+                    minimum: 1
                     type: integer
                   maxDuration:
                     type: string
                   maxRetries:
                     format: int32
+                    minimum: 0
                     type: integer
                 type: object
               secrets:

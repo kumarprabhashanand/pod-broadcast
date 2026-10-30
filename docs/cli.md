@@ -130,16 +130,18 @@ JSON and YAML follow [schema v1](../schemas/output-v1.json):
 }
 ```
 
-`mode` is `direct` or `controller`. `body` holds up to 1 MiB of the response in direct mode and 256 bytes in controller mode. With `--dry-run`, `outcome` is `DryRun` and pods that would be called have the state `Pending`.
+`mode` is `direct` or `controller`. `summary` counts the pods by result; after a revert it also counts `reverted` and `revertFailed`. `body` holds up to 1 MiB of the response in direct mode and 256 bytes in controller mode. With `--dry-run`, `outcome` is `DryRun` and pods that would be called have the state `Pending`.
 
 ## Exit codes
 
+Pods deleted during the call (`Gone`) count neither as successes nor as failures, and a failed revert counts as a failure. `outcome` in JSON follows the same rule.
+
 | Code | Meaning |
 |---|---|
-| 0 | Every pod succeeded (pods deleted during the call don't count as failures), or a dry run |
-| 1 | Some pods failed, or a revert failed |
+| 0 | No pod failed, or a dry run |
+| 1 | Some pods failed and others succeeded |
 | 2 | Usage error, no pods matched, missing permission, a request the pod proxy can't pass, or a Broadcast rejected by policy |
-| 3 | Every pod failed |
+| 3 | Pods failed and none succeeded |
 
 ## Controller mode
 

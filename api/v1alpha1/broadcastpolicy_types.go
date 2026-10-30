@@ -30,7 +30,9 @@ type Rule struct {
 }
 
 type Limits struct {
-	MaxConcurrency  *int32           `json:"maxConcurrency,omitempty"`
+	// +kubebuilder:validation:Minimum=1
+	MaxConcurrency *int32 `json:"maxConcurrency,omitempty"`
+	// +kubebuilder:validation:Minimum=0
 	MaxRetries      *int32           `json:"maxRetries,omitempty"`
 	DefaultDuration *metav1.Duration `json:"defaultDuration,omitempty"`
 	MaxDuration     *metav1.Duration `json:"maxDuration,omitempty"`

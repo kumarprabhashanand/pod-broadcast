@@ -118,7 +118,6 @@ func echoPod(name string, opts ...func(*corev1.Pod)) *corev1.Pod {
 				Image:           echoImage,
 				ImagePullPolicy: corev1.PullNever,
 				Args:            []string{"-listen", ":8080,:8081", "-tls-listen", ":8443"},
-				Env:             []corev1.EnvVar{{Name: "POD_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"}}}},
 				Ports: []corev1.ContainerPort{
 					{Name: "http", ContainerPort: 8080},
 					{Name: "management", ContainerPort: 8081},

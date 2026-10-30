@@ -10,11 +10,14 @@ Every Broadcast is a Kubernetes object, so creating one is subject to RBAC and t
 
 ## Install
 
-The project isn't released yet, so build the image and make it available to your cluster first:
+The project isn't released yet, so build the image and make it available to your cluster first. For a kind cluster:
 
 ```sh
 docker build -t pod-broadcast-controller:dev .
+kind load docker-image pod-broadcast-controller:dev
 ```
+
+For other clusters, push the image to a registry the cluster can pull from, and set it as the `image` in the manifest.
 
 **For all namespaces**, in `pod-broadcast-system`. Broadcasts in a namespace without a BroadcastPolicy are rejected.
 
@@ -75,7 +78,7 @@ The spec can't be changed after creation. The controller calls at most 1,000 pod
 
 A `Continuous` broadcast applies its request to every ready pod, then to each pod that becomes ready, until its `duration` ends. The duration defaults to the policy's `defaultDuration`, else 1h, and can't exceed the policy's `maxDuration`, else the controller's `--max-duration`, 24h.
 
-At the end, the `revert` request goes to every pod the request reached that still exists. `kubectl broadcast stop NAME` ends it early and keeps the object; deleting it also reverts. A policy change that no longer allows the broadcast ends it too.
+At the end, the `revert` request goes to every pod the request reached that still exists. `kubectl broadcast stop NAME` ends it early and keeps the object; deleting it also reverts. A policy change that no longer allows the broadcast ends it too, and so does deleting its target.
 
 A pod runs with the old setting from the moment it becomes ready until the controller reaches it.
 

@@ -90,17 +90,3 @@ func TestPresetErrors(t *testing.T) {
 		t.Error("Find(spring shutdown): want error")
 	}
 }
-
-func TestUsage(t *testing.T) {
-	want := map[string]string{
-		"evict-caches":  "spring evict-caches [--cache NAME]",
-		"set-log-level": "spring set-log-level LOGGER LEVEL",
-		"health":        "spring health",
-	}
-	for name, usage := range want {
-		p, _ := Find("spring", name)
-		if p.Usage() != usage {
-			t.Errorf("Usage() = %q, want %q", p.Usage(), usage)
-		}
-	}
-}

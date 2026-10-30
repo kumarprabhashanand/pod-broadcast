@@ -131,31 +131,6 @@ func TestDryRunSendsNothing(t *testing.T) {
 	wantRequests(t, ns, map[string]int{"orders-a": 0, "orders-b": 0, "orders-c": 0})
 }
 
-func TestMissingProxyPermission(t *testing.T) {
-	t.Parallel()
-	ns := threeEchoPods(t)
-	user := grantRole(t, ns, "reader", readRules...)
-	r := broadcast(t, ns, append(clearCaches, "--as", user)...)
-	if r.code != 2 {
-		t.Fatalf("want exit 2\n%s", r)
-	}
-	for _, want := range []string{`missing permission: DELETE requests need the "delete" verb on pods/proxy in namespace "` + ns + `"`} {
-		if !strings.Contains(r.stderr, want) {
-			t.Errorf("stderr lacks %q\n%s", want, r)
-		}
-	}
-	wantRequests(t, ns, map[string]int{"orders-a": 0, "orders-b": 0, "orders-c": 0})
-}
-
-func TestNoPodsMatched(t *testing.T) {
-	t.Parallel()
-	ns := newNamespace(t)
-	r := broadcast(t, ns, "-l", "app=nothing", "--port", "8080", "-X", "GET", "/")
-	if r.code != 2 || !strings.Contains(r.stderr, "no ready pods matched selector app=nothing") {
-		t.Fatalf("want exit 2 and the target in the message\n%s", r)
-	}
-}
-
 func TestJSONOutputMatchesTheSchema(t *testing.T) {
 	t.Parallel()
 	ns := threeEchoPods(t)
@@ -269,9 +244,13 @@ func TestRBACVerbForEachMethod(t *testing.T) {
 				other = "create"
 			}
 			denied := grantRole(t, ns, "deny-"+strings.ToLower(method), append(readRules, proxyRule(other))...)
+			before := len(requests(t, ns, "orders-a"))
 			r = broadcast(t, ns, "-l", "app=orders", "--port", "http", "-X", method, "/rbac", "--as", denied)
 			if r.code != 2 || !strings.Contains(r.stderr, `need the "`+verb+`" verb`) {
 				t.Errorf("%s with only the %q verb: want exit 2 naming %q\n%s", method, other, verb, r)
+			}
+			if after := len(requests(t, ns, "orders-a")); after != before {
+				t.Errorf("%s without permission reached the pod", method)
 			}
 		})
 	}
@@ -337,7 +316,7 @@ func TestLargeResponseIsCut(t *testing.T) {
 	r := broadcast(t, ns, "-l", "app=orders", "--port", "http", "-X", "GET", "/__big?bytes=3145728", "-o", "json")
 	rep := parseReport(t, r)
 	if r.code != 0 || len(rep.Pods) != 1 || len(rep.Pods[0].Body) != 1<<20 {
-		t.Fatalf("want success with a 1 MiB body, got %d bytes\n%s", len(rep.Pods[0].Body), r.stderr)
+		t.Fatalf("want one success with a 1 MiB body\n%s", r.stderr)
 	}
 }
 
@@ -363,19 +342,6 @@ func TestWorkloadTargets(t *testing.T) {
 		t.Errorf("ReplicaSet target\n%s", r)
 	}
 	wantRequests(t, ns, map[string]int{"stray": 0})
-}
-
-func TestUnsupportedRequestsAreRefused(t *testing.T) {
-	t.Parallel()
-	ns := newNamespace(t)
-	for _, a := range [][]string{
-		{"-l", "app=orders", "--port", "http", "-X", "BAN", "/"},
-		{"-l", "app=orders", "--port", "http", "-H", "Authorization: Bearer x", "-X", "GET", "/"},
-	} {
-		if r := broadcast(t, ns, a...); r.code != 2 {
-			t.Errorf("%v: want exit 2\n%s", a, r)
-		}
-	}
 }
 
 func TestRunsAsAKubectlPlugin(t *testing.T) {

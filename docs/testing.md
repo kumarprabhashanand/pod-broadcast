@@ -30,17 +30,14 @@ Tests run the plugin as a user would and check its output and exit code. They do
 | `TestEveryPodRefusesConnections` | Every pod refusing connections gives a connection error per pod; exit code 3 |
 | `TestNotReadyPodsAreSkipped` | Not-ready pods are skipped, also when the Service publishes not-ready addresses; `--include-not-ready` calls them |
 | `TestDryRunSendsNothing` | `--dry-run` lists the pods and the request, hides secret values, and sends nothing |
-| `TestMissingProxyPermission` | A user without `pods/proxy` gets an error naming the verb; no pod is called; exit code 2 |
-| `TestRBACVerbForEachMethod` | Each HTTP method needs exactly its documented RBAC verb on `pods/proxy` |
+| `TestRBACVerbForEachMethod` | Each HTTP method needs exactly its documented RBAC verb on `pods/proxy`; without it the command names the verb, calls no pod and exits 2 |
 | `TestExampleRoleIsEnough` | The [example Role](../examples/rbac/direct-user.yaml) allows every method and target kind |
-| `TestNoPodsMatched` | A selector matching nothing names the target; exit code 2 |
 | `TestJSONOutputMatchesTheSchema` | JSON output, including dry runs and selector targets, validates against schema v1 |
 | `TestRequestReachesThePodUnchanged` | A PATCH arrives with its path, query, `Host`, body and headers from flags, the environment and a Secret, while the output hides the secret values |
 | `TestHTTPSAndAnnotations` | HTTPS pods are reached using the port and scheme pod annotations |
 | `TestLargeResponseIsCut` | A 3 MiB response succeeds and is cut to 1 MiB |
 | `TestWorkloadTargets` | Deployment and ReplicaSet targets call only their own pods |
 | `TestPodInSeveralSlicesIsCalledOnce` | A pod listed in IPv4 and IPv6 EndpointSlices is called once; on a dual-stack cluster, with a real dual-stack Service |
-| `TestUnsupportedRequestsAreRefused` | Methods and headers the pod proxy can't pass are refused with exit code 2 |
 | `TestHundredPodsFinishQuickly` | 100 pods finish in under 10 seconds at the default concurrency |
 | `TestRunsAsAKubectlPlugin` | kubectl finds and runs the plugin |
 
@@ -66,9 +63,9 @@ Tests run the plugin as a user would and check its output and exit code. They do
 
 | Environment | Kubernetes | When | Result |
 |---|---|---|---|
-| kind on GitHub Actions | 1.35, 1.36, 1.37, and 1.37 dual-stack | Every pull request and every push to `main` | All 26 tests pass |
-| kind on a laptop (Docker Desktop) | 1.37 | Manually, 2026-10-29 | All 26 tests pass |
-| Amazon EKS | 1.37 | Manually, 2026-10-29 | All 26 tests pass; 100 pods in 1.7 seconds |
+| kind on GitHub Actions | 1.35, 1.36, 1.37, and 1.37 dual-stack | Every pull request and every push to `main` | All tests pass |
+| kind on a laptop (Docker Desktop) | 1.37 | Manually, 2026-10-29 | All tests pass |
+| Amazon EKS | 1.37 | Manually, 2026-10-29 | All tests pass; 100 pods in 1.7 seconds |
 
 ## Not covered yet
 

@@ -94,11 +94,10 @@ func (o *rootOptions) newBroadcast(ns string, inv invocation, spec request.Spec,
 		codes[i] = strings.TrimSpace(codes[i])
 	}
 	b.Spec.Mode = v1alpha1.Once
-	retries := int32(o.retries)
 	b.Spec.Execution = v1alpha1.Execution{
 		Concurrency:  int32(o.concurrency),
 		Timeout:      &metav1.Duration{Duration: o.timeout},
-		Retries:      &retries,
+		Retries:      new(int32(o.retries)),
 		Backoff:      &metav1.Duration{Duration: o.backoff},
 		SuccessCodes: codes,
 	}
@@ -183,7 +182,7 @@ func report(ctx context.Context, c client.Reader, key client.ObjectKey, timeout 
 	}
 	if st.Phase == v1alpha1.Active {
 		fmt.Fprintf(errOut, "broadcast %s keeps applying to new pods until %s; end it early with: kubectl broadcast stop %s\n",
-			b.Name, st.ExpiresAt.Local().Format(time.Kitchen), b.Name)
+			b.Name, st.ExpiresAt.Local().Format(time.DateTime), b.Name)
 	}
 	if st.Summary.Targeted == 0 {
 		return output.Write(out, format, output.FromBroadcast(b))

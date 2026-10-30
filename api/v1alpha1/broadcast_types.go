@@ -81,8 +81,10 @@ type Revert struct {
 	Body string `json:"body,omitempty"`
 }
 
-// Execution's fields are pointers so that a zero value from a Go client still gets the default.
+// Execution sets how the pods are called.
 type Execution struct {
+	// Timeout, Retries and Backoff are pointers, so that a zero value from a Go client gets the default.
+
 	// Pods called at the same time.
 	// +kubebuilder:default=10
 	// +kubebuilder:validation:Minimum=1
@@ -153,6 +155,17 @@ type Summary struct {
 	Gone         int32 `json:"gone"`
 	Reverted     int32 `json:"reverted,omitempty"`
 	RevertFailed int32 `json:"revertFailed,omitempty"`
+}
+
+// Outcome is what the results add up to. Pods that are gone count neither way.
+func (s Summary) Outcome() Phase {
+	switch {
+	case s.Failed == 0:
+		return Succeeded
+	case s.Succeeded == 0:
+		return Failed
+	}
+	return PartiallyFailed
 }
 
 type PodResult struct {

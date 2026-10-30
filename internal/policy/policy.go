@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -132,8 +133,8 @@ func matching(rules []v1alpha1.Rule, ref target.Ref, method, path string) ([]v1a
 }
 
 func allows(r v1alpha1.Rule, ref target.Ref, method, path string) (bool, error) {
-	if !anyOf(r.Targets, func(t string) bool { return matchesTarget(t, ref) }) ||
-		!anyOf(r.Methods, func(m string) bool { return strings.EqualFold(m, method) }) {
+	if !slices.ContainsFunc(r.Targets, func(t string) bool { return matchesTarget(t, ref) }) ||
+		!slices.ContainsFunc(r.Methods, func(m string) bool { return strings.EqualFold(m, method) }) {
 		return false, nil
 	}
 	for _, p := range r.Paths {
@@ -154,15 +155,6 @@ func matchesTarget(entry string, ref target.Ref) bool {
 	}
 	r, err := target.ParseRef(entry)
 	return err == nil && ref.Kind != "" && r.Kind == ref.Kind && r.Name == ref.Name
-}
-
-func anyOf(items []string, f func(string) bool) bool {
-	for _, s := range items {
-		if f(s) {
-			return true
-		}
-	}
-	return false
 }
 
 func lower(a, b *int32) *int32 {

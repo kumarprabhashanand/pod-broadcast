@@ -73,7 +73,7 @@ func EnvHeader(s string, lookupEnv func(string) (string, bool)) (Header, error) 
 
 // SecretHeaders turns every key of secret into a header.
 func SecretHeaders(secret *corev1.Secret) ([]Header, error) {
-	headers := make([]Header, 0, len(secret.Data)+len(secret.StringData))
+	headers := make([]Header, 0, len(secret.Data))
 	for k, v := range secret.Data {
 		h, err := newHeader(k, strings.TrimSpace(string(v)), true)
 		if err != nil {

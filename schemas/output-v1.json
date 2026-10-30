@@ -44,7 +44,9 @@
         "targeted": { "type": "integer", "minimum": 0 },
         "succeeded": { "type": "integer", "minimum": 0 },
         "failed": { "type": "integer", "minimum": 0 },
-        "gone": { "type": "integer", "minimum": 0 }
+        "gone": { "type": "integer", "minimum": 0 },
+        "reverted": { "type": "integer", "minimum": 0 },
+        "revertFailed": { "type": "integer", "minimum": 0 }
       }
     },
     "pods": {

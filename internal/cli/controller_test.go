@@ -16,7 +16,9 @@ import (
 	"github.com/kumarprabhashanand/pod-broadcast/api/v1alpha1"
 )
 
-func TestControllerModeCreatesABroadcast(t *testing.T) {
+// createBroadcast runs the plugin with --wait=false and returns the Broadcast it created.
+func createBroadcast(t *testing.T, args ...string) v1alpha1.Broadcast {
+	t.Helper()
 	var cl *cluster
 	newCluster := func(f *genericclioptions.ConfigFlags) (*cluster, error) {
 		c, err := fakeCluster(&recorder{})(f)
@@ -24,9 +26,7 @@ func TestControllerModeCreatesABroadcast(t *testing.T) {
 		return c, err
 	}
 	streams, _, out, errOut := genericiooptions.NewTestIOStreams()
-	code := run([]string{"svc/orders", "spring", "evict-caches", "--mode", "controller", "--wait=false",
-		"-H", "X-Trace: t1", "--headers-from-secret", "auth", "--concurrency", "5", "--success-codes", "2xx, 404"}, streams, newCluster)
-	if code != 0 {
+	if code := run(append(args, "--wait=false"), streams, newCluster); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, errOut.String())
 	}
 	var b v1alpha1.Broadcast
@@ -34,6 +34,12 @@ func TestControllerModeCreatesABroadcast(t *testing.T) {
 	if err := cl.client.Get(context.Background(), key, &b); err != nil {
 		t.Fatal(err)
 	}
+	return b
+}
+
+func TestControllerModeCreatesABroadcast(t *testing.T) {
+	b := createBroadcast(t, "svc/orders", "spring", "evict-caches", "--mode", "controller",
+		"-H", "X-Trace: t1", "--headers-from-secret", "auth", "--concurrency", "5", "--success-codes", "2xx, 404")
 	s := b.Spec
 	if !strings.HasPrefix(b.Name, "orders-") || s.Target.Service != "orders" || s.Mode != v1alpha1.Once {
 		t.Errorf("object = %+v", b)
@@ -58,12 +64,11 @@ func TestControllerModeRefusesDirectOnlyFlags(t *testing.T) {
 }
 
 func finished(name string, phase v1alpha1.Phase, summary v1alpha1.Summary, message string) *v1alpha1.Broadcast {
-	port := intstr.FromInt32(8081)
 	return &v1alpha1.Broadcast{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "shop"},
 		Spec: v1alpha1.BroadcastSpec{
 			Target:  v1alpha1.Target{Service: "orders"},
-			Request: v1alpha1.Request{Port: &port, Method: "DELETE", Path: "/actuator/caches"},
+			Request: v1alpha1.Request{Port: new(intstr.FromInt32(8081)), Method: "DELETE", Path: "/actuator/caches"},
 		},
 		Status: v1alpha1.BroadcastStatus{
 			Phase: phase, Message: message, Summary: summary,
@@ -91,22 +96,7 @@ func TestWait(t *testing.T) {
 }
 
 func TestForMakesAContinuousBroadcast(t *testing.T) {
-	var cl *cluster
-	newCluster := func(f *genericclioptions.ConfigFlags) (*cluster, error) {
-		c, err := fakeCluster(&recorder{})(f)
-		cl = c
-		return c, err
-	}
-	streams, _, out, errOut := genericiooptions.NewTestIOStreams()
-	code := run([]string{"deploy/orders", "spring", "set-log-level", "com.shop", "DEBUG", "--for", "30m", "--wait=false"}, streams, newCluster)
-	if code != 0 {
-		t.Fatalf("exit %d, stderr %q", code, errOut.String())
-	}
-	var b v1alpha1.Broadcast
-	if err := cl.client.Get(context.Background(), client.ObjectKey{Namespace: "shop", Name: strings.TrimSpace(out.String())}, &b); err != nil {
-		t.Fatal(err)
-	}
-	s := b.Spec
+	s := createBroadcast(t, "deploy/orders", "spring", "set-log-level", "com.shop", "DEBUG", "--for", "30m").Spec
 	if s.Mode != v1alpha1.Continuous || s.Duration.Duration.String() != "30m0s" || s.Target.WorkloadRef.Kind != "Deployment" {
 		t.Errorf("spec = %+v", s)
 	}
@@ -124,7 +114,7 @@ func TestStop(t *testing.T) {
 	once.Spec.Mode = v1alpha1.Once
 
 	r := runWith(t, nil, []runtime.Object{stopped, once}, "stop", "debug")
-	if r.code != 0 || !strings.Contains(r.stdout, "orders-a  Reverted") {
+	if r.code != 0 || !strings.Contains(r.stdout, "orders-a  Reverted") || !strings.Contains(r.stdout, "1 succeeded, 1 reverted") {
 		t.Errorf("stop debug: exit %d\n%s%s", r.code, r.stdout, r.stderr)
 	}
 	r = runWith(t, nil, []runtime.Object{stopped, once}, "stop", "once")

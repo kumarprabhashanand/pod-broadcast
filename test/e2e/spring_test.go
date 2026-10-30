@@ -74,7 +74,7 @@ func TestSpringPresets(t *testing.T) {
 	run("spring", "info")
 
 	wantValues(t, values(t, ns), "1")
-	wantValues(t, values(t, ns), "1")
+	wantValues(t, values(t, ns), "1") // served from the cache
 	run("spring", "evict-caches")
 	wantValues(t, values(t, ns), "2")
 	run("spring", "evict-caches", "--cache", "values")

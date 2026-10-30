@@ -16,6 +16,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -24,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/kumarprabhashanand/pod-broadcast/api/v1alpha1"
-
 	"github.com/kumarprabhashanand/pod-broadcast/internal/request"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
 	"github.com/kumarprabhashanand/pod-broadcast/internal/transport"
@@ -89,7 +89,7 @@ func ordersPod(name string, ready bool) *corev1.Pod {
 		status = corev1.ConditionFalse
 	}
 	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "shop", UID: "uid-" + "pod", Labels: map[string]string{"app": "orders"}},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "shop", UID: types.UID("uid-" + name), Labels: map[string]string{"app": "orders"}},
 		Spec: corev1.PodSpec{Containers: []corev1.Container{{
 			Name:  "app",
 			Ports: []corev1.ContainerPort{{Name: "management", ContainerPort: 8081}},
