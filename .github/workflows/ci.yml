@@ -58,3 +58,7 @@ jobs:
             echo "$target"
             GOOS=${target%/*} GOARCH=${target#*/} CGO_ENABLED=0 go build -o /dev/null ./cmd/kubectl-broadcast
           done
+      - name: Build the controller image for both release platforms
+        run: |
+          docker buildx create --use
+          docker buildx build --platform linux/amd64,linux/arm64 .

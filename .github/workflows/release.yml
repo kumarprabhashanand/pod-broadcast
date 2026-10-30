@@ -5,12 +5,17 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release
+      packages: write # push the controller image
+      id-token: write # sign the attestations
+      attestations: write
+      artifact-metadata: write
     env:
       VERSION: ${{ github.ref_name }}
       IMAGE: ghcr.io/${{ github.repository }}-controller
@@ -21,40 +26,66 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - name: Take the release notes from the changelog
+        run: |
+          awk -v v="## ${VERSION#v}" '$0 == v || index($0, v " ") == 1 {f = 1; next} /^## / {f = 0} f' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md" || { echo "CHANGELOG.md has no section for ${VERSION#v}"; exit 1; }
       - run: go test ./...
       - name: Build the plugin
         run: |
           mkdir dist
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
             os=${target%/*} arch=${target#*/}
-            ext=""; [ "$os" = windows ] && ext=".exe"
+            bin=kubectl-broadcast; [ "$os" = windows ] && bin=kubectl-broadcast.exe
             dir=$(mktemp -d)
             GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -trimpath \
               -ldflags "-s -X github.com/kumarprabhashanand/pod-broadcast/internal/version.version=$VERSION" \
-              -o "$dir/kubectl-broadcast$ext" ./cmd/kubectl-broadcast
+              -o "$dir/$bin" ./cmd/kubectl-broadcast
             cp LICENSE "$dir/"
             if [ "$os" = windows ]; then
-              (cd "$dir" && zip -q "$GITHUB_WORKSPACE/dist/kubectl-broadcast_${VERSION}_${os}_${arch}.zip" ./*)
+              (cd "$dir" && zip -q "$GITHUB_WORKSPACE/dist/kubectl-broadcast_${VERSION}_${os}_${arch}.zip" "$bin" LICENSE)
             else
-              tar -C "$dir" -czf "dist/kubectl-broadcast_${VERSION}_${os}_${arch}.tar.gz" .
+              tar -C "$dir" -czf "dist/kubectl-broadcast_${VERSION}_${os}_${arch}.tar.gz" "$bin" LICENSE
             fi
           done
       - name: Publish the controller image
+        id: image
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
+          SOURCE: https://github.com/${{ github.repository }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker build -t "$IMAGE:$VERSION" --build-arg "VERSION=$VERSION" \
-            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+          docker buildx create --use
+          docker buildx build --platform linux/amd64,linux/arm64 --build-arg "VERSION=$VERSION" \
+            --label "org.opencontainers.image.source=$SOURCE" \
             --label "org.opencontainers.image.version=$VERSION" \
-            --label "org.opencontainers.image.licenses=Apache-2.0" .
-          docker push "$IMAGE:$VERSION"
+            --label "org.opencontainers.image.licenses=Apache-2.0" \
+            --sbom=true --provenance=mode=max \
+            --tag "$IMAGE:$VERSION" --metadata-file "$RUNNER_TEMP/image.json" --push .
+          digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/image.json")
+          [[ $digest == sha256:* ]] || { echo "no image digest"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Prepare the manifests
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
         run: |
           for f in controller controller-namespaced; do
-            sed "s#image: pod-broadcast-controller:dev#image: $IMAGE:$VERSION#" "deploy/$f.yaml" > "dist/$f.yaml"
+            sed "s#image: pod-broadcast-controller:dev#image: $IMAGE:$VERSION@$DIGEST#" "deploy/$f.yaml" > "dist/$f.yaml"
+            grep -qF "image: $IMAGE:$VERSION@$DIGEST" "dist/$f.yaml" || { echo "dist/$f.yaml: image not replaced"; exit 1; }
           done
-          cp deploy/crds/*.yaml dist/
+          cp deploy/crds/*.yaml deploy/user-roles.yaml dist/
+          hack/krew-manifest.sh "$VERSION" dist > dist/broadcast.krew.yaml
           (cd dist && sha256sum * > checksums.txt)
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: dist/checksums.txt
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$VERSION" dist/* --title "$VERSION" --generate-notes --verify-tag
+        run: gh release create "$VERSION" dist/* --title "$VERSION" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
