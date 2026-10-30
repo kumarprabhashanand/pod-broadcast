@@ -194,12 +194,18 @@ func TestPodInSeveralSlicesIsCalledOnce(t *testing.T) {
 		svc.Spec.IPFamilyPolicy = &policy
 		svc.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
 		createService(t, ns, svc)
-		waitEndpoints(t, ns, "orders", 2)
-		slices, err := client.DiscoveryV1().EndpointSlices(ns).List(ctx(t), metav1.ListOptions{LabelSelector: "kubernetes.io/service-name=orders"})
-		must(t, err)
-		if len(slices.Items) < 2 {
-			t.Fatalf("dual-stack Service has %d EndpointSlices, want 2", len(slices.Items))
-		}
+		eventually(t, time.Minute, "an EndpointSlice per address family, each listing both pods", func() bool {
+			slices, err := client.DiscoveryV1().EndpointSlices(ns).List(ctx(t), metav1.ListOptions{LabelSelector: "kubernetes.io/service-name=orders"})
+			if err != nil || len(slices.Items) < 2 {
+				return false
+			}
+			for _, s := range slices.Items {
+				if len(s.Endpoints) < 2 {
+					return false
+				}
+			}
+			return true
+		})
 	} else {
 		createService(t, ns, &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Name: "orders"},
