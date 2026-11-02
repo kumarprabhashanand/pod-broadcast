@@ -42,7 +42,7 @@ The release image is signed with a build attestation: `gh attestation verify oci
 
 **Memory** grows with the cluster: the controller keeps the Pods, EndpointSlices, Services and workloads it can see in memory. In a large cluster, prefer the single-namespace install, or add a memory limit to the manifest after watching its usage.
 
-**Upgrade** by applying the same files again. **Uninstall** in this order: delete every Broadcast and wait until they are gone, so that `Continuous` ones revert; delete the controller manifest; delete the CRDs.
+**Upgrade** by applying the same files again. **Uninstall** in this order: delete every Broadcast and wait until they are gone, so that `Continuous` ones revert; delete the controller manifest; delete `user-roles.yaml` and the CRDs.
 
 ## Broadcast
 
