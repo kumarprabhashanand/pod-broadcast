@@ -21,9 +21,9 @@ fi
 IMAGES=(pod-broadcast-echo:e2e pod-broadcast-spring:e2e pod-broadcast-controller:dev)
 
 if [[ -z ${SKIP_BUILD:-} ]]; then
-  docker build -q -t pod-broadcast-echo:e2e test/apps/echo
-  docker build -q -t pod-broadcast-spring:e2e test/apps/spring
-  docker build -q -t pod-broadcast-controller:dev .
+  docker build -t pod-broadcast-echo:e2e test/apps/echo
+  docker build -t pod-broadcast-spring:e2e test/apps/spring
+  docker build -t pod-broadcast-controller:dev .
 fi
 
 if ! kind get clusters | grep -qx "$CLUSTER"; then

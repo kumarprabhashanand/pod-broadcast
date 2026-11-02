@@ -29,7 +29,7 @@ Download the archive for your platform from the [latest release](https://github.
 To check a download, compare it with `checksums.txt`, and verify that it was built by this repository's release workflow with the [GitHub CLI](https://cli.github.com/):
 
 ```sh
-sha256sum --check --ignore-missing checksums.txt
+sha256sum --check --ignore-missing checksums.txt   # on macOS: shasum -a 256 --check --ignore-missing checksums.txt
 gh attestation verify kubectl-broadcast_v0.1.0_linux_amd64.tar.gz --repo kumarprabhashanand/pod-broadcast
 ```
 
