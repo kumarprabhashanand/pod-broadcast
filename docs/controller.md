@@ -116,7 +116,7 @@ spec:
 - A broadcast passes when its request, and its revert, each match one rule on target, port, method and path together.
 - `targets` are written like CLI targets; `"*"` matches any target, and is the only way to allow label selectors.
 - `ports` are compared by number on each pod, so a number can't be used to get around a rule written with a name.
-- `paths` are RE2 patterns that must match the whole path and query. So that no server reads a path as another one than the pattern matched, broadcasts are rejected when their path has `.` or `..` segments, `;`, a backslash, or percent-encoded `.`, `/`, backslash or `%`: `/actuator/caches/../shutdown` would match `/actuator/caches(/.*)?`, and many servers resolve it to `/actuator/shutdown`.
+- `paths` are RE2 patterns that must match the whole path and query, and also the path without its query, so that a wildcard can't reach into the query: `/actuator/.*/refresh` doesn't allow `/actuator/shutdown?x=/refresh`. Allow an optional query with `(\?.*)?`. So that no server reads a path as another one than the pattern matched, broadcasts are rejected when their path has `.` or `..` segments, `;`, `#`, a backslash, or percent-encoded `.`, `/`, backslash or `%`: `/actuator/caches/../shutdown` would match `/actuator/caches(/.*)?`, and many servers resolve it to `/actuator/shutdown`.
 - Secrets used in `headersFromSecrets` must be listed in `secrets` and carry the label `broadcast.prabhash.net/use=true`.
 - All policies in the namespace count; for `limits`, the strictest value wins.
 

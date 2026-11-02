@@ -51,7 +51,7 @@ The CRDs and the controller aren't installed; see [Controller](controller.md#ins
 Check `kubectl get pods -n pod-broadcast-system`, or the namespace of a single-namespace install, and the controller's logs.
 
 **`broadcast NAME rejected: ...`**
-A BroadcastPolicy doesn't allow it, and nothing was called. The message names what didn't match: no policy in the namespace, the method and path, the revert, a limit, or a Secret that isn't listed or lacks the label `broadcast.prabhash.net/use=true`. A path with a `..` segment, `;` or percent-encoded characters is rejected where policies apply; see [BroadcastPolicy](controller.md#broadcastpolicy).
+A BroadcastPolicy doesn't allow it, and nothing was called. The message names what didn't match: no policy in the namespace, the method and path, the revert, a limit, or a Secret that isn't listed or lacks the label `broadcast.prabhash.net/use=true`. A path with a `..` segment, `;`, `#` or percent-encoded characters is rejected where policies apply; see [BroadcastPolicy](controller.md#broadcastpolicy).
 
 **`port 8080 isn't allowed by a BroadcastPolicy`** (in a pod's row)
 The policy names the port differently on this pod. Use the port the policy allows, by name or by the number it stands for on the pod.

@@ -145,12 +145,15 @@ func allows(r v1alpha1.Rule, ref target.Ref, method, path string) (bool, error) 
 		!slices.ContainsFunc(r.Methods, func(m string) bool { return strings.EqualFold(m, method) }) {
 		return false, nil
 	}
+	// The path must also match without its query, so that a wildcard can't reach into the query:
+	// "/actuator/.*/refresh" matches all of "/actuator/shutdown?x=/refresh".
+	bare, _, _ := strings.Cut(path, "?")
 	for _, p := range r.Paths {
 		re, err := regexp.Compile(`^(?:` + p + `)$`)
 		if err != nil {
 			return false, fmt.Errorf("BroadcastPolicy path %q: %w", p, err)
 		}
-		if re.MatchString(path) {
+		if re.MatchString(path) && re.MatchString(bare) {
 			return true, nil
 		}
 	}
@@ -168,7 +171,7 @@ func unambiguous(raw string) error {
 		}
 	}
 	lower := strings.ToLower(path)
-	for _, s := range []string{"%2e", "%2f", "%5c", "%25", "\\", ";"} {
+	for _, s := range []string{"%2e", "%2f", "%5c", "%25", "\\", ";", "#"} {
 		if strings.Contains(lower, s) {
 			return fmt.Errorf("path %q contains %q, which servers may read as a path no BroadcastPolicy rule allows", raw, s)
 		}

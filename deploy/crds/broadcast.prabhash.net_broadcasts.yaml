@@ -148,7 +148,7 @@ spec:
                   path:
                     description: |-
                       Path and query. Where a BroadcastPolicy applies, the path can't have "." or ".." segments,
-                      ";", a backslash, or percent-encoded ".", "/", backslash or "%".
+                      ";", "#", a backslash, or percent-encoded ".", "/", backslash or "%".
                     pattern: ^/\S*$
                     type: string
                   port:

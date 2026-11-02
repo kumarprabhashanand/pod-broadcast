@@ -28,9 +28,10 @@ type Rule struct {
 	// HTTP methods, compared without regard to case.
 	// +kubebuilder:validation:MinItems=1
 	Methods []string `json:"methods"`
-	// RE2 patterns matched against the whole path and query. Paths with "." or ".." segments, ";",
-	// a backslash, or percent-encoded ".", "/", backslash or "%" are refused, so that no server reads
-	// them as a path the pattern doesn't allow.
+	// RE2 patterns, each matched against the whole path and query, and against the path without its
+	// query, so that a wildcard can't reach into the query; allow an optional query with (\?.*)?.
+	// Paths with "." or ".." segments, ";", "#", a backslash, or percent-encoded ".", "/", backslash
+	// or "%" are refused, so that no server reads them as a path the pattern doesn't allow.
 	// +kubebuilder:validation:MinItems=1
 	Paths []string `json:"paths"`
 }

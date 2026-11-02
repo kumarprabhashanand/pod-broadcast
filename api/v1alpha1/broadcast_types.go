@@ -75,7 +75,7 @@ type Request struct {
 	// +kubebuilder:validation:Pattern=`^[A-Za-z]+$`
 	Method string `json:"method"`
 	// Path and query. Where a BroadcastPolicy applies, the path can't have "." or ".." segments,
-	// ";", a backslash, or percent-encoded ".", "/", backslash or "%".
+	// ";", "#", a backslash, or percent-encoded ".", "/", backslash or "%".
 	// +kubebuilder:validation:Pattern=`^/\S*$`
 	Path string `json:"path"`
 	// Headers are sent as they are, and anyone who can read the Broadcast sees them. Put secret
