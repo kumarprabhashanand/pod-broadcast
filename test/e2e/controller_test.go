@@ -236,8 +236,16 @@ func TestContinuousReachesNewPodsAndStops(t *testing.T) {
 	ns := newNamespace(t)
 	allowAll(t, ns)
 	webDeployment(t, ns, 2)
+	createService(t, ns, &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "web"},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{"app": "web"},
+			Ports:    []corev1.ServicePort{{Port: 80, TargetPort: intstr.FromString("http")}},
+		},
+	})
+	waitEndpoints(t, ns, "web", 2)
 
-	r := broadcast(t, ns, controller("deploy/web", "spring", "set-log-level", "com.shop", "debug", "--for", "5m", "--name", "debug")...)
+	r := broadcast(t, ns, controller("svc/web", "spring", "set-log-level", "com.shop", "debug", "--for", "5m", "--name", "debug")...)
 	if r.code != 0 || !strings.Contains(r.stdout, "2 targeted: 2 succeeded") || !strings.Contains(r.stderr, "kubectl broadcast stop debug") {
 		t.Fatalf("first pass\n%s", r)
 	}
