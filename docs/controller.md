@@ -13,7 +13,7 @@ Every Broadcast is a Kubernetes object, so creating one is subject to RBAC and t
 Install from a [release](https://github.com/kumarprabhashanand/pod-broadcast/releases). Its manifests run the image `ghcr.io/kumarprabhashanand/pod-broadcast-controller` for linux/amd64 and linux/arm64, pinned by digest.
 
 ```sh
-VERSION=v0.1.0
+VERSION=v0.1.1
 URL=https://github.com/kumarprabhashanand/pod-broadcast/releases/download/$VERSION
 ```
 

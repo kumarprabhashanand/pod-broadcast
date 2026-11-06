@@ -30,7 +30,7 @@ To check a download, compare it with `checksums.txt`, and verify that it was bui
 
 ```sh
 sha256sum --check --ignore-missing checksums.txt   # on macOS: shasum -a 256 --check --ignore-missing checksums.txt
-gh attestation verify kubectl-broadcast_v0.1.0_linux_amd64.tar.gz --repo kumarprabhashanand/pod-broadcast
+gh attestation verify kubectl-broadcast_v0.1.1_linux_amd64.tar.gz --repo kumarprabhashanand/pod-broadcast
 ```
 
 On macOS, a binary downloaded with a browser is quarantined until you allow it: run `xattr -d com.apple.quarantine kubectl-broadcast`, or allow it in System Settings, Privacy & Security.
