@@ -15,13 +15,20 @@ metadata:
 spec:
   version: $version
   homepage: $repo
-  shortDescription: Send one HTTP request to every ready pod of a workload
+  shortDescription: Send an HTTP request to every ready pod
   description: |
     Sends one HTTP request to every ready pod of a Service, workload or label
-    selector, through the API server's pod proxy, and shows each pod's result.
-    Presets cover common Spring Boot Actuator operations, such as evicting
-    caches and changing log levels. An optional controller also reaches pods
-    that start later, and reverts the change at the end.
+    selector, and shows each pod's result with an exit code for scripts. A
+    request through a Service reaches only one pod, so this is for changes
+    that every replica has to get, such as clearing a cache or changing a log
+    level. Presets cover common Spring Boot Actuator operations.
+
+    Requests go through the API server's pod proxy with your own credentials,
+    so nothing has to be installed in the cluster.
+  caveats: |
+    This plugin needs the pods/proxy permission in the target namespace, with
+    the verb that matches each HTTP method. Details:
+    $repo/blob/main/docs/rbac.md
   platforms:
 YAML
 for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
