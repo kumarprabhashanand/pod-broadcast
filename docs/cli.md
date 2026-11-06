@@ -102,7 +102,7 @@ Presets are built-in requests. `kubectl broadcast presets` lists them with the r
 | `--cache` | | Cache to evict, for `spring evict-caches` |
 | `--base-path` | `/actuator` | Actuator base path `{base}` |
 
-The endpoints must be exposed by the application, for example with `management.endpoints.web.exposure.include=health,info,caches,loggers,refresh`. `refresh` needs Spring Cloud. To read a level back, use `-X GET {base}/loggers/LOGGER`.
+The endpoints must be exposed by the application, for example with `management.endpoints.web.exposure.include=health,info,caches,loggers,refresh`. `refresh` needs Spring Cloud. To read a level back, use `-X GET {base}/loggers/LOGGER`. A `204` from `evict-caches` means the application accepted the request, even with no caches to evict; `-X GET {base}/caches` lists them.
 
 ## Output
 
@@ -142,6 +142,8 @@ Pods deleted during the call (`Gone`) count neither as successes nor as failures
 | 1 | Some pods failed and others succeeded |
 | 2 | Usage error, no pods matched, missing permission, a request the pod proxy can't pass, or a Broadcast rejected by policy |
 | 3 | Pods failed and none succeeded |
+
+kubectl itself exits with 1 when it can't start the plugin, for example when flags come before `broadcast`.
 
 ## Controller mode
 
