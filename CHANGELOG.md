@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `stop` and `wait` say so when the Broadcast API isn't installed.
+- A failed Broadcast's Event has the type `Warning`.
+
 ## 0.1.0
 
 First public release.

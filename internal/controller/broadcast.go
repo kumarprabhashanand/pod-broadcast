@@ -320,7 +320,7 @@ func setPhase(b *v1alpha1.Broadcast, phase v1alpha1.Phase) {
 func (r *BroadcastReconciler) event(b *v1alpha1.Broadcast, note string) {
 	s := b.Status.Summary
 	kind := corev1.EventTypeNormal
-	if b.Status.Phase == v1alpha1.Rejected || s.Failed > 0 {
+	if b.Status.Phase == v1alpha1.Rejected || b.Status.Phase == v1alpha1.Failed || s.Failed > 0 {
 		kind = corev1.EventTypeWarning
 	}
 	if note == "" {
@@ -415,7 +415,7 @@ func (r *BroadcastReconciler) endpoints(ctx context.Context, b *v1alpha1.Broadca
 	req := b.Spec.Request
 	eps, err := target.Endpoints(set, target.PortChoice{Port: req.Port, Scheme: req.Scheme, DefaultPort: req.DefaultPort})
 	if err != nil {
-		return nil, "no port: set request.port, or annotate the pods with " + target.AnnotationPort
+		return nil, "no port: use --port or request.port, or annotate the pods with " + target.AnnotationPort
 	}
 	for i := range eps {
 		if eps[i].Err == nil && !d.AllowsPort(eps[i].Pod, eps[i].Port) {

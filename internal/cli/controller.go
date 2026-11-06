@@ -21,6 +21,8 @@ import (
 	"github.com/kumarprabhashanand/pod-broadcast/internal/target"
 )
 
+var errNoBroadcastAPI = errors.New("the Broadcast API isn't installed in this cluster; install the pod-broadcast controller first")
+
 // viaController creates a Broadcast for the controller to run, and waits for its result.
 func (o *rootOptions) viaController(ctx context.Context, cl *cluster, inv invocation, spec request.Spec, call *preset.Call, choice target.PortChoice) error {
 	switch {
@@ -43,7 +45,7 @@ func (o *rootOptions) viaController(ctx context.Context, cl *cluster, inv invoca
 	}
 	if err := cl.client.Create(ctx, b); err != nil {
 		if meta.IsNoMatchError(err) {
-			return errors.New("the Broadcast API isn't installed in this cluster; install the pod-broadcast controller first")
+			return errNoBroadcastAPI
 		}
 		return err
 	}
@@ -195,8 +197,11 @@ func report(ctx context.Context, c client.Reader, key client.ObjectKey, timeout 
 
 func getBroadcast(ctx context.Context, c client.Reader, key client.ObjectKey, b *v1alpha1.Broadcast) error {
 	err := c.Get(ctx, key, b)
-	if apierrors.IsNotFound(err) {
+	switch {
+	case apierrors.IsNotFound(err):
 		return fmt.Errorf("broadcast %q not found in namespace %q", key.Name, key.Namespace)
+	case meta.IsNoMatchError(err):
+		return errNoBroadcastAPI
 	}
 	return err
 }
