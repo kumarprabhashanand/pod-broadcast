@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -150,7 +151,7 @@ func newStopCommand(o *rootOptions) *cobra.Command {
 			}
 			key := client.ObjectKey{Namespace: cl.namespace, Name: args[0]}
 			var b v1alpha1.Broadcast
-			if err := cl.client.Get(cmd.Context(), key, &b); err != nil {
+			if err := getBroadcast(cmd.Context(), cl.client, key, &b); err != nil {
 				return err
 			}
 			if b.Spec.Mode != v1alpha1.Continuous {
@@ -180,14 +181,24 @@ func report(ctx context.Context, c client.Reader, key client.ObjectKey, timeout 
 	if st.Phase == v1alpha1.Rejected || (st.Phase == v1alpha1.Failed && st.Summary.Targeted == 0) {
 		return fmt.Errorf("broadcast %s %s: %s", b.Name, strings.ToLower(string(st.Phase)), st.Message)
 	}
-	if st.Phase == v1alpha1.Active {
-		fmt.Fprintf(errOut, "broadcast %s keeps applying to new pods until %s; end it early with: kubectl broadcast stop %s\n",
-			b.Name, st.ExpiresAt.Local().Format(time.DateTime), b.Name)
-	}
 	if st.Summary.Targeted == 0 {
-		return output.Write(out, format, output.FromBroadcast(b))
+		err = output.Write(out, format, output.FromBroadcast(b))
+	} else {
+		err = writeReport(out, format, output.FromBroadcast(b))
 	}
-	return writeReport(out, format, output.FromBroadcast(b))
+	if st.Phase == v1alpha1.Active {
+		fmt.Fprintf(errOut, "broadcast %s keeps applying to new pods until %s; end it early with: kubectl broadcast stop %s -n %s\n",
+			b.Name, st.ExpiresAt.Local().Format("2006-01-02 15:04:05 MST"), b.Name, b.Namespace)
+	}
+	return err
+}
+
+func getBroadcast(ctx context.Context, c client.Reader, key client.ObjectKey, b *v1alpha1.Broadcast) error {
+	err := c.Get(ctx, key, b)
+	if apierrors.IsNotFound(err) {
+		return fmt.Errorf("broadcast %q not found in namespace %q", key.Name, key.Namespace)
+	}
+	return err
 }
 
 func waitDone(ctx context.Context, c client.Reader, key client.ObjectKey, timeout time.Duration, errOut io.Writer) (*v1alpha1.Broadcast, error) {
@@ -195,7 +206,7 @@ func waitDone(ctx context.Context, c client.Reader, key client.ObjectKey, timeou
 	warnAt := time.Now().Add(10 * time.Second)
 	for {
 		var b v1alpha1.Broadcast
-		if err := c.Get(ctx, key, &b); err != nil {
+		if err := getBroadcast(ctx, c, key, &b); err != nil {
 			return nil, err
 		}
 		_, stopping := b.Annotations[v1alpha1.StopAnnotation]

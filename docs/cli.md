@@ -153,7 +153,7 @@ Pods deleted during the call (`Gone`) count neither as successes nor as failures
 | `--wait` | `true` | Wait for the result. `--wait=false` prints the Broadcast's name and returns. |
 | `--wait-timeout` | `5m` | How long `--wait` waits |
 
-The table, JSON and exit codes are the same as in direct mode. With `--for`, the command returns after the first pass and prints how to stop the broadcast early.
+The table, JSON and exit codes are the same as in direct mode. With `--for`, the command returns after the first pass and prints how to stop the broadcast early. The broadcast stays active even when the first pass failed, until it expires or you stop it.
 
 `kubectl broadcast wait NAME` waits for a Broadcast created any other way, for example from YAML in CI, and reports it with the same exit codes. For a running `--for` broadcast it reports the first pass.
 
