@@ -2,8 +2,10 @@
 
 ## Unreleased
 
+## 0.1.1
+
 - `stop` and `wait` say so when the Broadcast API isn't installed.
-- A failed Broadcast's Event has the type `Warning`.
+- A failed Broadcast's Event has the type `Warning`, and its no-port message names `--port`.
 
 ## 0.1.0
 
