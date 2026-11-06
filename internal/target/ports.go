@@ -32,8 +32,8 @@ type Endpoint struct {
 	Err    error
 }
 
-// PortChoice holds the requested port and scheme, and the port name to use when neither the
-// request nor the pod's annotation names a port.
+// PortChoice holds the requested port and scheme, and the port name to use on pods that have it
+// when neither the request nor the pod's annotation names a port.
 type PortChoice struct {
 	Port        *intstr.IntOrString
 	Scheme      string
@@ -41,7 +41,8 @@ type PortChoice struct {
 }
 
 // Endpoints chooses a port and scheme for every pod in set. For the port the first rule that applies
-// wins: the requested port, the pod's port annotation, the default port, the Service's only port.
+// wins: the requested port, the pod's port annotation, the default port if the pod has it, the
+// Service's only port.
 // It returns ErrNoPort when no rule applies to any pod.
 func Endpoints(set Set, choice PortChoice) ([]Endpoint, error) {
 	var servicePort *intstr.IntOrString
@@ -108,7 +109,10 @@ func portSpec(pod *corev1.Pod, choice PortChoice, servicePort *intstr.IntOrStrin
 		return p, true, nil
 	}
 	if choice.DefaultPort != "" {
-		return intstr.FromString(choice.DefaultPort), true, nil
+		p := intstr.FromString(choice.DefaultPort)
+		if _, err := ContainerPort(pod, p); !errors.Is(err, ErrPortNotFound) {
+			return p, true, nil
+		}
 	}
 	if servicePort != nil {
 		return *servicePort, true, nil

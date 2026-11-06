@@ -141,7 +141,7 @@ Exit codes: 0 every pod succeeded, 1 some pods failed, 2 usage error or no pods,
 	f := cmd.Flags()
 	f.StringVarP(&o.selector, "selector", "l", "", "Label selector for the target pods, instead of TARGET")
 	f.StringVarP(&o.method, "request", "X", "", "HTTP method; needs a PATH argument")
-	f.StringVar(&o.port, "port", "", "Container port name or number (default: the pod annotation "+target.AnnotationPort+", then the Service's only port)")
+	f.StringVar(&o.port, "port", "", "Container port name or number (default: the pod annotation "+target.AnnotationPort+", then for presets the port named management, then the Service's only port)")
 	f.StringVar(&o.scheme, "scheme", "", "http or https (default: the pod annotation "+target.AnnotationScheme+", then http)")
 	f.BoolVar(&o.includeNotReady, "include-not-ready", false, "Also call pods that aren't ready")
 	f.StringArrayVarP(&o.headers, "header", "H", nil, "Request header 'Name: value'; repeatable")

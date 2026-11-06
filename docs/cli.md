@@ -49,7 +49,7 @@ The port is chosen for each pod; the first rule that applies wins:
 
 1. `--port NAME|NUMBER`
 2. The pod annotation `broadcast.prabhash.net/port`, a port name or number
-3. For presets, the container port named `management` (`request.defaultPort` in a Broadcast)
+3. For presets, the container port named `management`, on pods that have one (`request.defaultPort` in a Broadcast)
 4. For Service targets, the Service's only port, translated to its target port
 
 A port name is looked up among the pod's TCP container ports, including sidecar containers. If no rule applies to any pod, the command stops and lists the options. A pod whose named port is missing, or defined twice, fails on its own while the others go ahead.
@@ -102,7 +102,7 @@ Presets are built-in requests. `kubectl broadcast presets` lists them with the r
 | `--cache` | | Cache to evict, for `spring evict-caches` |
 | `--base-path` | `/actuator` | Actuator base path `{base}` |
 
-The endpoints must be exposed by the application, for example with `management.endpoints.web.exposure.include=health,info,caches,loggers,refresh`. `refresh` needs Spring Cloud.
+The endpoints must be exposed by the application, for example with `management.endpoints.web.exposure.include=health,info,caches,loggers,refresh`. `refresh` needs Spring Cloud. To read a level back, use `-X GET {base}/loggers/LOGGER`.
 
 ## Output
 
@@ -130,7 +130,7 @@ JSON and YAML follow [schema v1](../schemas/output-v1.json):
 }
 ```
 
-`mode` is `direct` or `controller`. `summary` counts the pods by result; after a revert it also counts `reverted` and `revertFailed`. `body` holds up to 1 MiB of the response in direct mode and 256 bytes in controller mode. With `--dry-run`, `outcome` is `DryRun` and pods that would be called have the state `Pending`.
+`mode` is `direct` or `controller`. `summary` counts the pods by result; after a revert it also counts `reverted` and `revertFailed`. `body` is a string with up to 1 MiB of the response in direct mode, and 256 bytes in controller mode. With `--dry-run`, `outcome` is `DryRun` and pods that would be called have the state `Pending`.
 
 ## Exit codes
 
@@ -153,7 +153,7 @@ Pods deleted during the call (`Gone`) count neither as successes nor as failures
 | `--wait` | `true` | Wait for the result. `--wait=false` prints the Broadcast's name and returns. |
 | `--wait-timeout` | `5m` | How long `--wait` waits |
 
-The table, JSON and exit codes are the same as in direct mode. With `--for`, the command returns after the first pass and prints how to stop the broadcast early.
+The table, JSON and exit codes are the same as in direct mode. With `--for`, the command returns after the first pass and prints how to stop the broadcast early. The broadcast stays active even when the first pass failed, until it expires or you stop it.
 
 `kubectl broadcast wait NAME` waits for a Broadcast created any other way, for example from YAML in CI, and reports it with the same exit codes. For a running `--for` broadcast it reports the first pass.
 

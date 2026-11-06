@@ -45,6 +45,13 @@ func TestEndpointsPortRules(t *testing.T) {
 			choice: PortChoice{DefaultPort: "management"},
 			want:   8081,
 		},
+		{
+			name:   "Service port when the pod lacks the default port",
+			pod:    newPod("a", container(port("http", 8080))),
+			svc:    []corev1.ServicePort{{Port: 80, TargetPort: intstr.FromString("http")}},
+			choice: PortChoice{DefaultPort: "management"},
+			want:   8080,
+		},
 		{name: "Service target port number", pod: newPod("a"), svc: []corev1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080)}}, want: 8080},
 		{name: "Service target port name", pod: newPod("a", management), svc: []corev1.ServicePort{{Port: 80, TargetPort: intstr.FromString("http")}}, want: 8080},
 		{name: "Service port without target port", pod: newPod("a"), svc: []corev1.ServicePort{{Port: 80}}, want: 80},
@@ -76,15 +83,17 @@ func TestEndpointsPortRules(t *testing.T) {
 
 func TestEndpointsWithoutAnyRule(t *testing.T) {
 	tests := []struct {
-		name string
-		svc  []corev1.ServicePort
+		name   string
+		svc    []corev1.ServicePort
+		choice PortChoice
 	}{
 		{name: "workload target"},
+		{name: "workload target, pods lack the default port", choice: PortChoice{DefaultPort: "management"}},
 		{name: "Service with several ports", svc: []corev1.ServicePort{{Name: "http", Port: 80}, {Name: "management", Port: 8081}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := Endpoints(Set{Pods: []*corev1.Pod{newPod("a"), newPod("b")}, ServicePorts: tt.svc}, PortChoice{})
+			_, err := Endpoints(Set{Pods: []*corev1.Pod{newPod("a"), newPod("b")}, ServicePorts: tt.svc}, tt.choice)
 			if !errors.Is(err, ErrNoPort) {
 				t.Errorf("error = %v, want ErrNoPort", err)
 			}

@@ -352,7 +352,7 @@ func grantRole(t *testing.T, ns, name string, rules ...rbacv1.PolicyRule) string
 // readRules are what a direct-mode user needs besides pods/proxy.
 var readRules = []rbacv1.PolicyRule{
 	{APIGroups: []string{""}, Resources: []string{"services"}, Verbs: []string{"get"}},
-	{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}},
+	{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"list"}},
 	{APIGroups: []string{"discovery.k8s.io"}, Resources: []string{"endpointslices"}, Verbs: []string{"list"}},
 	{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets", "daemonsets", "replicasets"}, Verbs: []string{"get"}},
 }

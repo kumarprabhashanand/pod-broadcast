@@ -95,6 +95,16 @@ func TestWait(t *testing.T) {
 	}
 }
 
+func TestActiveBroadcastEndsWithTheStopHint(t *testing.T) {
+	b := finished("debug", v1alpha1.Active, v1alpha1.Summary{Targeted: 2, Succeeded: 1, Failed: 1}, "")
+	b.Spec.Mode = v1alpha1.Continuous
+	b.Status.ExpiresAt = new(metav1.Now())
+	r := runWith(t, nil, []runtime.Object{b}, "wait", "debug")
+	if r.code != 1 || !strings.HasSuffix(strings.TrimSpace(r.stderr), "kubectl broadcast stop debug -n shop") {
+		t.Errorf("exit %d, stderr %q", r.code, r.stderr)
+	}
+}
+
 func TestForMakesAContinuousBroadcast(t *testing.T) {
 	s := createBroadcast(t, "deploy/orders", "spring", "set-log-level", "com.shop", "DEBUG", "--for", "30m").Spec
 	if s.Mode != v1alpha1.Continuous || s.Duration.Duration.String() != "30m0s" || s.Target.WorkloadRef.Kind != "Deployment" {
@@ -120,5 +130,9 @@ func TestStop(t *testing.T) {
 	r = runWith(t, nil, []runtime.Object{stopped, once}, "stop", "once")
 	if r.code != 2 || !strings.Contains(r.stderr, "only Continuous broadcasts can be stopped") {
 		t.Errorf("stop once: exit %d, stderr %q", r.code, r.stderr)
+	}
+	r = runWith(t, nil, nil, "stop", "nope")
+	if r.code != 2 || !strings.Contains(r.stderr, `broadcast "nope" not found in namespace "shop"`) {
+		t.Errorf("stop nope: exit %d, stderr %q", r.code, r.stderr)
 	}
 }
