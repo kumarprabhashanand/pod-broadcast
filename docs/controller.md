@@ -61,6 +61,8 @@ kubectl delete -n shop -f $URL/controller-namespaced.yaml
 kubectl delete lease -n shop pod-broadcast-controller
 ```
 
+Events of past broadcasts remain until the API server expires them.
+
 ## Broadcast
 
 ```yaml
@@ -136,6 +138,7 @@ spec:
 - `paths` are RE2 patterns that must match the whole path and query, and also the path without its query, so that a wildcard can't reach into the query: `/actuator/.*/refresh` doesn't allow `/actuator/shutdown?x=/refresh`. Allow an optional query with `(\?.*)?`. So that no server reads a path as another one than the pattern matched, broadcasts are rejected when their path has `.` or `..` segments, `;`, `#`, a backslash, or percent-encoded `.`, `/`, backslash or `%`: `/actuator/caches/../shutdown` would match `/actuator/caches(/.*)?`, and many servers resolve it to `/actuator/shutdown`.
 - Secrets used in `headersFromSecrets` must be listed in `secrets` and carry the label `broadcast.prabhash.net/use=true`.
 - All policies in the namespace count; for `limits`, the strictest value wins.
+- Policies apply to Broadcasts only. Direct mode is limited by RBAC on `pods/proxy`; see [Security](security.md#controller).
 
 ## Permissions
 

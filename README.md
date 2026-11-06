@@ -26,7 +26,7 @@ Requests go through the Kubernetes API server's pod proxy with your own credenti
 
 Download the archive for your platform from the [latest release](https://github.com/kumarprabhashanand/pod-broadcast/releases/latest), unpack it, and put `kubectl-broadcast` on your `PATH`; kubectl then runs it as `kubectl broadcast`.
 
-To check a download, compare it with `checksums.txt`, and verify that it was built by this repository's release workflow with the [GitHub CLI](https://cli.github.com/):
+To check a download, compare it with `checksums.txt`, and verify that it was built by this repository's release workflow with the [GitHub CLI](https://cli.github.com/), after `gh auth login`:
 
 ```sh
 sha256sum --check --ignore-missing checksums.txt   # on macOS: shasum -a 256 --check --ignore-missing checksums.txt
@@ -55,22 +55,22 @@ kubectl broadcast svc/orders spring evict-caches
 kubectl broadcast deploy/orders --port 8081 -X POST /admin/reload
 
 # Raise a log level on every pod, read it back, then reset it
-kubectl broadcast deploy/orders spring set-log-level com.shop.orders DEBUG
-kubectl broadcast deploy/orders --port management -X GET /actuator/loggers/com.shop.orders
-kubectl broadcast deploy/orders spring reset-log-level com.shop.orders
+kubectl broadcast svc/orders spring set-log-level com.shop.orders DEBUG
+kubectl broadcast svc/orders --port management -X GET /actuator/loggers/com.shop.orders
+kubectl broadcast svc/orders spring reset-log-level com.shop.orders
 
 # Read health from every pod, as JSON
-kubectl broadcast -l app=orders spring health -o json
+kubectl broadcast svc/orders spring health -o json
 
 # Show the pods and the exact request without sending anything
 kubectl broadcast svc/orders spring refresh --dry-run
 
 # With the controller: DEBUG logging for 30 minutes, also on pods that start meanwhile
-kubectl broadcast deploy/orders spring set-log-level com.shop.orders DEBUG --for 30m --name debug
+kubectl broadcast svc/orders spring set-log-level com.shop.orders DEBUG --for 30m --name debug
 kubectl broadcast stop debug   # end it early; the level is reset on every pod
 ```
 
-The exit code is 0 when no pod failed, 1 when some failed, 2 for a usage error or when no pods matched, and 3 when pods failed and none succeeded, so scripts and CI can react.
+The exit code is 0 when no pod failed, 1 when some failed, 2 when nothing was called (a usage error, no matching pods, a missing permission or a policy refusal), and 3 when pods failed and none succeeded, so scripts and CI can react.
 
 ## Documentation
 

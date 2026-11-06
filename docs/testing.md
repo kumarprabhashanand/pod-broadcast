@@ -55,7 +55,7 @@ Tests run the plugin as a user would and check its output and exit code. They do
 | `TestControllerExitCodesAndWait` | A partial failure exits 1, both from `--mode controller` and from `kubectl broadcast wait` on a Broadcast created from YAML |
 | `TestControllerDeletesAfterTTL` | `ttlSecondsAfterFinished: 0` deletes the Broadcast after it ran |
 | `TestControllerPolicy` | No policy, a path or a port the policy doesn't allow, and an unlabeled or unlisted Secret are all refused; a listed, labeled Secret's header reaches the pods |
-| `TestContinuousReachesNewPodsAndStops` | `--for` reaches pods added by scaling up; `stop` reverts every pod exactly once and keeps the Broadcast `Completed` |
+| `TestContinuousReachesNewPodsAndStops` | `--for` on a Service reaches pods added by scaling up; `stop` reverts every pod exactly once and keeps the Broadcast `Completed` |
 | `TestContinuousSurvivesRestartAndExpires` | After the controller restarts, new pods are still reached; at expiry every pod is reverted exactly once, with no duplicate calls |
 | `TestNamespacedInstall` | The single-namespace manifest runs broadcasts in its namespace without a policy, and ignores other namespaces |
 | `TestDefaultUserRolesCoverBroadcasts` | With `deploy/user-roles.yaml`, Kubernetes' `view`, `edit` and `admin` roles get the documented permissions, and `edit` is enough to run a broadcast |
@@ -74,7 +74,6 @@ Tests run the plugin as a user would and check its output and exit code. They do
 - The controller calling pods over HTTPS (direct mode's HTTPS is covered)
 - A pod deleted while it is being called (covered by unit tests only)
 - A revert that fails, and the resulting exit code
-- A `Continuous` broadcast with a Service target
 - StatefulSet and DaemonSet targets end to end (they share the Deployment code path, which is covered)
 - The 1,000-pod limits end to end (covered by unit tests), failover between two controller replicas, and service meshes with strict mTLS
 
