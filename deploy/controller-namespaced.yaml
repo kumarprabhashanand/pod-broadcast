@@ -1,5 +1,5 @@
-# Runs the controller for one namespace: kubectl apply -n NAMESPACE -f deploy/controller-namespaced.yaml
-# Apply deploy/crds first, once per cluster. Without a BroadcastPolicy, broadcasts are allowed.
+# Runs the controller for one namespace: kubectl apply -n NAMESPACE -f controller-namespaced.yaml
+# Apply the CRDs first, once per cluster. Without a BroadcastPolicy, broadcasts are allowed.
 apiVersion: v1
 kind: ServiceAccount
 metadata:

@@ -33,7 +33,7 @@ sha256sum --check --ignore-missing checksums.txt   # on macOS: shasum -a 256 --c
 gh attestation verify kubectl-broadcast_v0.1.0_linux_amd64.tar.gz --repo kumarprabhashanand/pod-broadcast
 ```
 
-On macOS, a downloaded binary is quarantined until you allow it: run `xattr -d com.apple.quarantine kubectl-broadcast`, or allow it in System Settings, Privacy & Security.
+On macOS, a binary downloaded with a browser is quarantined until you allow it: run `xattr -d com.apple.quarantine kubectl-broadcast`, or allow it in System Settings, Privacy & Security.
 
 ### With Go
 
@@ -54,8 +54,9 @@ kubectl broadcast svc/orders spring evict-caches
 # Any HTTP request: a port name or number, a method and a path
 kubectl broadcast deploy/orders --port 8081 -X POST /admin/reload
 
-# Raise a log level on every pod, then put it back
+# Raise a log level on every pod, read it back, then reset it
 kubectl broadcast deploy/orders spring set-log-level com.shop.orders DEBUG
+kubectl broadcast deploy/orders --port management -X GET /actuator/loggers/com.shop.orders
 kubectl broadcast deploy/orders spring reset-log-level com.shop.orders
 
 # Read health from every pod, as JSON
@@ -74,7 +75,7 @@ The exit code is 0 when no pod failed, 1 when some failed, 2 for a usage error o
 ## Documentation
 
 - [CLI reference](docs/cli.md): targets, flags, port selection, presets, output and exit codes
-- [Controller](docs/controller.md): install, Broadcast and BroadcastPolicy objects, Continuous mode
+- [Controller](docs/controller.md): install, uninstall, Broadcast and BroadcastPolicy objects, Continuous mode
 - [Permissions](docs/rbac.md): the RBAC rules a direct-mode user needs, with an example Role
 - [Troubleshooting](docs/troubleshooting.md): what each error means and how to fix it
 - [Security](docs/security.md): what the plugin and the controller can access, and how to limit it

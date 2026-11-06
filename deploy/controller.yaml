@@ -1,4 +1,4 @@
-# Runs the controller for all namespaces. Apply deploy/crds first.
+# Runs the controller for all namespaces. Apply the CRDs first.
 apiVersion: v1
 kind: Namespace
 metadata:

@@ -23,7 +23,7 @@ Other methods either don't pass the API server's pod proxy, or need permission f
 The API server removes the `Authorization` header from proxied requests, so the pod would never see it. If the application accepts another header, such as an API key header, use that one, ideally with `--header-from-env` or `--headers-from-secret`.
 
 **`flags cannot be placed before plugin name`**
-This comes from kubectl. Write `kubectl broadcast --context dev ...`, not `kubectl --context dev broadcast ...`.
+This comes from kubectl, which exits with 1 here. Write `kubectl broadcast --context dev ...`, not `kubectl --context dev broadcast ...`.
 
 ## A pod fails (exit code 1 or 3)
 
@@ -52,6 +52,9 @@ Check `kubectl get pods -n pod-broadcast-system`, or the namespace of a single-n
 
 **`broadcast NAME rejected: ...`**
 A BroadcastPolicy doesn't allow it, and nothing was called. The message names what didn't match: no policy in the namespace, the method and path, the revert, a limit, or a Secret that isn't listed or lacks the label `broadcast.prabhash.net/use=true`. A path with a `..` segment, `;`, `#` or percent-encoded characters is rejected where policies apply; see [BroadcastPolicy](controller.md#broadcastpolicy).
+
+**`broadcasts.broadcast.prabhash.net "debug" already exists`**
+A finished Broadcast is kept for an hour by default, so its name stays taken. Use another `--name`, or delete it with `kubectl delete broadcast debug`.
 
 **`port 8080 isn't allowed by a BroadcastPolicy`** (in a pod's row)
 The policy names the port differently on this pod. Use the port the policy allows, by name or by the number it stands for on the pod.

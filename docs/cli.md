@@ -102,7 +102,7 @@ Presets are built-in requests. `kubectl broadcast presets` lists them with the r
 | `--cache` | | Cache to evict, for `spring evict-caches` |
 | `--base-path` | `/actuator` | Actuator base path `{base}` |
 
-The endpoints must be exposed by the application, for example with `management.endpoints.web.exposure.include=health,info,caches,loggers,refresh`. `refresh` needs Spring Cloud.
+The endpoints must be exposed by the application, for example with `management.endpoints.web.exposure.include=health,info,caches,loggers,refresh`. `refresh` needs Spring Cloud. To read a level back, use `-X GET {base}/loggers/LOGGER`.
 
 ## Output
 
@@ -130,7 +130,7 @@ JSON and YAML follow [schema v1](../schemas/output-v1.json):
 }
 ```
 
-`mode` is `direct` or `controller`. `summary` counts the pods by result; after a revert it also counts `reverted` and `revertFailed`. `body` holds up to 1 MiB of the response in direct mode and 256 bytes in controller mode. With `--dry-run`, `outcome` is `DryRun` and pods that would be called have the state `Pending`.
+`mode` is `direct` or `controller`. `summary` counts the pods by result; after a revert it also counts `reverted` and `revertFailed`. `body` is a string with up to 1 MiB of the response in direct mode, and 256 bytes in controller mode. With `--dry-run`, `outcome` is `DryRun` and pods that would be called have the state `Pending`.
 
 ## Exit codes
 

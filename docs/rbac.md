@@ -6,7 +6,7 @@
 |---|---|---|
 | `services` | `get` | Service targets |
 | `endpointslices` (`discovery.k8s.io`) | `list` | Members of a Service |
-| `pods` | `get`, `list` | Readiness and ports |
+| `pods` | `list` | Readiness and ports |
 | `deployments`, `statefulsets`, `daemonsets`, `replicasets` (`apps`) | `get` | Workload targets |
 | `pods/proxy` | depends on the method, see below | The calls themselves |
 | `secrets` | `get` | Only with `--headers-from-secret` |
@@ -28,7 +28,7 @@ Anyone allowed to use `pods/proxy` on a pod can already call that pod's ports di
 [`examples/rbac/direct-user.yaml`](../examples/rbac/direct-user.yaml) is a Role with every permission above except Secrets. Apply it and bind it to a user or group:
 
 ```sh
-kubectl apply -n shop -f examples/rbac/direct-user.yaml
+kubectl apply -n shop -f https://raw.githubusercontent.com/kumarprabhashanand/pod-broadcast/main/examples/rbac/direct-user.yaml
 kubectl create rolebinding broadcast-direct-user -n shop --role=broadcast-direct-user --user=jane@example.com
 ```
 
@@ -37,7 +37,7 @@ Narrow it as needed, for example by dropping the `pods/proxy` verbs you don't us
 ## Checking your access
 
 ```sh
-kubectl auth can-i create pods --subresource=proxy -n shop
+kubectl auth can-i create pods --subresource=proxy -n shop   # the verb for your method: delete for spring evict-caches
 kubectl auth can-i list endpointslices.discovery.k8s.io -n shop
 ```
 

@@ -30,7 +30,7 @@ kubectl apply -f $URL/user-roles.yaml
 kubectl apply -f $URL/controller.yaml
 ```
 
-**Or for one namespace**, with permissions in that namespace only. Without a BroadcastPolicy, broadcasts are allowed, since the namespace's RBAC already decides who may create them.
+**Or for one namespace**, with permissions in that namespace only. Without a BroadcastPolicy, broadcasts are allowed, since the namespace's RBAC already decides who may create them. This is the simplest way to try the controller.
 
 ```sh
 kubectl apply -n shop -f $URL/controller-namespaced.yaml
@@ -42,7 +42,24 @@ The release image is signed with a build attestation: `gh attestation verify oci
 
 **Memory** grows with the cluster: the controller keeps the Pods, EndpointSlices, Services and workloads it can see in memory. In a large cluster, prefer the single-namespace install, or add a memory limit to the manifest after watching its usage.
 
-**Upgrade** by applying the same files again. **Uninstall** in this order: delete every Broadcast and wait until they are gone, so that `Continuous` ones revert; delete the controller manifest; delete `user-roles.yaml` and the CRDs.
+**Upgrade** by applying the same files again.
+
+## Uninstall
+
+Delete every Broadcast first, so that `Continuous` ones revert. `kubectl delete` waits until they are gone.
+
+```sh
+kubectl delete broadcasts --all -A
+kubectl delete -f $URL/controller.yaml
+kubectl delete -f $URL/user-roles.yaml -f $URL/broadcast.prabhash.net_broadcasts.yaml -f $URL/broadcast.prabhash.net_broadcastpolicies.yaml
+```
+
+For the single-namespace install, replace the second command with these, as the controller creates its leader election Lease at runtime:
+
+```sh
+kubectl delete -n shop -f $URL/controller-namespaced.yaml
+kubectl delete lease -n shop pod-broadcast-controller
+```
 
 ## Broadcast
 
