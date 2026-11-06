@@ -37,7 +37,7 @@ Narrow it as needed, for example by dropping the `pods/proxy` verbs you don't us
 ## Checking your access
 
 ```sh
-kubectl auth can-i create pods/proxy -n shop
+kubectl auth can-i create pods --subresource=proxy -n shop
 kubectl auth can-i list endpointslices.discovery.k8s.io -n shop
 ```
 

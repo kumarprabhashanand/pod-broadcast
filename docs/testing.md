@@ -65,7 +65,7 @@ Tests run the plugin as a user would and check its output and exit code. They do
 | Environment | Kubernetes | When | Result |
 |---|---|---|---|
 | kind on GitHub Actions | 1.35, 1.36, 1.37, and 1.37 dual-stack | Every pull request and every push to `main` | All tests pass |
-| kind with Docker Desktop | 1.37 | Manually, 2026-10-29 | All tests pass |
+| kind with Docker Desktop | 1.37 | Manually, 2026-11-06 | All tests pass |
 | Amazon EKS | 1.37 | Manually, 2026-10-30 | All tests pass; 100 pods in 1.6 seconds |
 
 ## Not covered yet
