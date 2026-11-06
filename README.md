@@ -45,6 +45,8 @@ This needs Go 1.26 or newer; Go downloads the 1.27 toolchain the module asks for
 
 ## Quick start
 
+Put kubectl flags such as `--context` and `-n` after `broadcast`. Presets call the container port named `management`, or a Service's only port; use `--port` for any other.
+
 ```sh
 # Clear the caches on every ready pod of a Spring Boot app
 kubectl broadcast svc/orders spring evict-caches
@@ -66,8 +68,6 @@ kubectl broadcast svc/orders spring refresh --dry-run
 kubectl broadcast deploy/orders spring set-log-level com.shop.orders DEBUG --for 30m --name debug
 kubectl broadcast stop debug   # end it early; the level is reset on every pod
 ```
-
-Put kubectl flags such as `--context` and `-n` after `broadcast`.
 
 The exit code is 0 when no pod failed, 1 when some failed, 2 for a usage error or when no pods matched, and 3 when pods failed and none succeeded, so scripts and CI can react.
 

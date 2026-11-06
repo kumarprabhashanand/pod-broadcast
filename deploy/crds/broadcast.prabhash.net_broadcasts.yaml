@@ -124,8 +124,9 @@ spec:
                     maxLength: 65536
                     type: string
                   defaultPort:
-                    description: DefaultPort is the port name used when neither port
-                      nor the pod's port annotation is set.
+                    description: |-
+                      DefaultPort is the port name used on pods that have it, when neither port nor the pod's port
+                      annotation is set.
                     type: string
                   headers:
                     additionalProperties:

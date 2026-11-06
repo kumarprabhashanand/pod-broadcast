@@ -49,7 +49,7 @@ The port is chosen for each pod; the first rule that applies wins:
 
 1. `--port NAME|NUMBER`
 2. The pod annotation `broadcast.prabhash.net/port`, a port name or number
-3. For presets, the container port named `management` (`request.defaultPort` in a Broadcast)
+3. For presets, the container port named `management`, on pods that have one (`request.defaultPort` in a Broadcast)
 4. For Service targets, the Service's only port, translated to its target port
 
 A port name is looked up among the pod's TCP container ports, including sidecar containers. If no rule applies to any pod, the command stops and lists the options. A pod whose named port is missing, or defined twice, fails on its own while the others go ahead.

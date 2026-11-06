@@ -11,7 +11,7 @@ The target exists but none of its pods is ready. Check `kubectl get pods`; to ca
 Check the name and the namespace. Targets are always in one namespace.
 
 **`can't choose a port: use --port NAME|NUMBER, or annotate the pods with broadcast.prabhash.net/port`**
-Nothing tells the plugin which port to call. Pass `--port`, or set the annotation in the pod template once. For a Service with several ports, the message lists their target ports.
+Nothing tells the plugin which port to call: a preset found no port named `management`, and the target isn't a Service with one port. Pass `--port`, or set the annotation in the pod template once. For a Service with several ports, the message lists their target ports.
 
 **`missing permission: POST requests need the "create" verb on pods/proxy in namespace "shop"`**
 You may read the pods but not call them with this method; no pod was called. See [Permissions](rbac.md). Errors such as `services "orders" is forbidden` mean you can't read the target itself.
@@ -36,7 +36,7 @@ The `ERROR` column, or `error` in JSON, says why:
 | `HTTP 500` and other codes | The application's own answer; the `BODY` column, or `body` in JSON, often says more. Use `--success-codes` if this code is expected. |
 | `dial tcp 10.244.0.9:8081: connect: connection refused` | Nothing listens on that port. Check `--port` and the container's ports. |
 | `timed out after 5s` | The pod didn't answer within `--timeout`. Raise it for slow operations. |
-| `port not found: no TCP container port named "management"` | This pod has no container port with that name; maybe it runs an older version during a rollout. |
+| `port not found: no TCP container port named "admin"` | `--port` or the port annotation names a port this pod doesn't have, maybe because it runs an older version during a rollout. |
 | `ambiguous port: 2 container ports are named "management"` | Two containers in the pod define the same port name. Use the port number instead. |
 | `pod is gone` | The pod was deleted during the call. It isn't counted as a failure. |
 

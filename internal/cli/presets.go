@@ -26,8 +26,8 @@ func newPresetsCommand(streams genericiooptions.IOStreams) *cobra.Command {
 			}
 			_, err := fmt.Fprintf(streams.Out, `
 {base} is --base-path if given, else %s.
-Spring presets call the container port named management, unless --port or the pod
-annotation %s says otherwise.
+Spring presets call the container port named management, or a Service's only port,
+unless --port or the pod annotation %s says otherwise.
 `, preset.DefaultBasePath, target.AnnotationPort)
 			return err
 		},

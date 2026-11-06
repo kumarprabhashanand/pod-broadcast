@@ -65,7 +65,8 @@ type Request struct {
 	// Port name or number. Defaults to the pod's port annotation, then defaultPort, then a
 	// Service's only port.
 	Port *intstr.IntOrString `json:"port,omitempty"`
-	// DefaultPort is the port name used when neither port nor the pod's port annotation is set.
+	// DefaultPort is the port name used on pods that have it, when neither port nor the pod's port
+	// annotation is set.
 	DefaultPort string `json:"defaultPort,omitempty"`
 	// Scheme is http or https. Defaults to the pod's scheme annotation, then http. Pod certificates
 	// aren't verified.
