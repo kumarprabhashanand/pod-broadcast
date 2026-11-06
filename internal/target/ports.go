@@ -78,8 +78,8 @@ func Endpoints(set Set, choice PortChoice) ([]Endpoint, error) {
 
 // ParsePort parses a port number or an IANA service name such as "management".
 func ParsePort(s string) (intstr.IntOrString, error) {
-	if n, err := strconv.Atoi(s); err == nil {
-		if errs := validation.IsValidPortNum(n); len(errs) > 0 {
+	if n, err := strconv.ParseInt(s, 10, 32); err == nil {
+		if errs := validation.IsValidPortNum(int(n)); len(errs) > 0 {
 			return intstr.IntOrString{}, fmt.Errorf("invalid port %q: %s", s, strings.Join(errs, ", "))
 		}
 		return intstr.FromInt32(int32(n)), nil
