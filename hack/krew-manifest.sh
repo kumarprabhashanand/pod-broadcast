@@ -18,10 +18,11 @@ spec:
   shortDescription: Send an HTTP request to every ready pod
   description: |
     Sends one HTTP request to every ready pod of a Service, workload or label
-    selector, and shows each pod's result with an exit code for scripts. A
-    request through a Service reaches only one pod, so this is for changes
-    that every replica has to get, such as clearing a cache or changing a log
-    level. Presets cover common Spring Boot Actuator operations.
+    selector, and shows each pod's result with an exit code for scripts.
+
+    A request to a Service normally goes to only one pod, which isn't enough
+    when every pod has to get it. The plugin also has built-in shortcuts for
+    common Spring Boot tasks, like clearing caches and changing log levels.
 
     Requests go through the API server's pod proxy with your own credentials,
     so nothing has to be installed in the cluster.
