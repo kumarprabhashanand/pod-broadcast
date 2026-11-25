@@ -11,7 +11,7 @@ Issues and pull requests are welcome.
 
 ## Development
 
-You need the Go version from `go.mod`. The end-to-end tests also need Docker and kind.
+You need the Go version from `go.mod`. When bumping Go, change the `toolchain` line in `go.mod` and the base images in `Dockerfile` and `test/apps/echo/Dockerfile` together; a test checks that they match. The end-to-end tests also need Docker and kind.
 
 ```sh
 make build      # bin/kubectl-broadcast
@@ -32,4 +32,4 @@ make e2e        # end-to-end tests on a kind cluster
 
 ## Releases
 
-A release is a tag `vX.Y.Z` on `main`. Before tagging, add a `## X.Y.Z` section to [CHANGELOG.md](CHANGELOG.md): the release workflow uses it as the release notes and fails without it. The workflow then publishes the plugin archives, the controller image, the manifests with the image pinned by digest, a krew manifest, checksums and build attestations.
+A release is a tag `vX.Y.Z` on `main`. Before tagging, add a `## X.Y.Z` section to [CHANGELOG.md](CHANGELOG.md): the release workflow uses it as the release notes and fails without it. The workflow then publishes the plugin archives, the controller image, the manifests with the image pinned by digest, checksums and build attestations. Last, krew-release-bot opens the krew-index pull request from [.krew.yaml](.krew.yaml).

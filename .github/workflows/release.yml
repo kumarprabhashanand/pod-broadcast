@@ -75,7 +75,6 @@ jobs:
             grep -qF "image: $IMAGE:$VERSION@$DIGEST" "dist/$f.yaml" || { echo "dist/$f.yaml: image not replaced"; exit 1; }
           done
           cp deploy/crds/*.yaml deploy/user-roles.yaml dist/
-          hack/krew-manifest.sh "$VERSION" dist > dist/broadcast.krew.yaml
           (cd dist && sha256sum * > checksums.txt)
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -89,3 +88,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$VERSION" dist/* --title "$VERSION" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+
+  # A separate job, so the third-party bot gets none of the release job's write permissions.
+  krew:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: rajatjindal/krew-release-bot@c970b8a8f6dbc2f2285a26e3ae160903b87002c3 # v0.0.51

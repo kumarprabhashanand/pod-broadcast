@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Built with Go 1.27.4.
+
 ## 0.1.1
 
 - `stop` and `wait` say so when the Broadcast API isn't installed.
