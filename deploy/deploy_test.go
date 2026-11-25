@@ -1,4 +1,4 @@
-// Package deploy holds the install manifests; its tests keep them consistent.
+// Package deploy holds the install manifests; its tests keep them, and the release inputs, consistent.
 package deploy
 
 import (

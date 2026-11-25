@@ -11,7 +11,7 @@ Issues and pull requests are welcome.
 
 ## Development
 
-You need the Go version from `go.mod`. The end-to-end tests also need Docker and kind.
+You need the Go version from `go.mod`. When bumping Go, change the `toolchain` line in `go.mod` and the base images in `Dockerfile` and `test/apps/echo/Dockerfile` together; a test checks that they match. The end-to-end tests also need Docker and kind.
 
 ```sh
 make build      # bin/kubectl-broadcast
