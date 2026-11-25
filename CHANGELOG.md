@@ -2,7 +2,10 @@
 
 ## Unreleased
 
+## 0.1.2
+
 - Built with Go 1.27.4.
+- Install with krew: `kubectl krew install broadcast`.
 
 ## 0.1.1
 
