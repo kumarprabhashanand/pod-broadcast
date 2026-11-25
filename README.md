@@ -24,7 +24,13 @@ Requests go through the Kubernetes API server's pod proxy with your own credenti
 
 ## Install
 
-Download the archive for your platform from the [latest release](https://github.com/kumarprabhashanand/pod-broadcast/releases/latest), unpack it, and put `kubectl-broadcast` on your `PATH`; kubectl then runs it as `kubectl broadcast`.
+With [krew](https://krew.sigs.k8s.io/):
+
+```sh
+kubectl krew install broadcast
+```
+
+Or download the archive for your platform from the [latest release](https://github.com/kumarprabhashanand/pod-broadcast/releases/latest), unpack it, and put `kubectl-broadcast` on your `PATH`; kubectl then runs it as `kubectl broadcast`.
 
 To check a download, compare it with `checksums.txt`, and verify that it was built by this repository's release workflow with the [GitHub CLI](https://cli.github.com/), after `gh auth login`:
 
