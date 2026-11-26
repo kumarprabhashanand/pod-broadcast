@@ -6,6 +6,8 @@
 
 `kubectl broadcast` sends one HTTP request to every ready pod of a Kubernetes Service, workload or label selector, and shows each pod's result.
 
+See the [project site](https://broadcast.prabhash.net/) for recorded examples and reference docs.
+
 ```console
 $ kubectl broadcast svc/orders spring evict-caches
 POD                    STATE      CODE  TIME  ATTEMPTS  ERROR
